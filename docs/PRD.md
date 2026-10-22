@@ -55,7 +55,7 @@ Cards are fully flexible and symmetric across three data slots:
 
 **Content Formats:**
 
-* Support for multi-line text, formulas, symbols, and graphics on any side. Full format support is the product vision; the MVP covers text only (see 6.1), the rest follows in Phase 2\.   
+* Support for multi-line text, formulas, symbols, and graphics on any side. Full format support is the product vision; the MVP covers text only (see 5.1), the rest follows in Phase 2\.   
 * **Optional Entry:** Card creation does not require all 3 fields. A card can store 1, 2, or 3 sides. A card with fewer than two sides is saved but is not studied until it is ready. This also lets you collect words you want to learn before you know their translation, for example to ask a teacher later.   
 * **Symmetry:** No side is hardcoded as the “Front” or “Back.” Any side can act as the starting prompt or answer key during study sessions.  
 * **Usage:** Once the deck is created, FlipStack will name the sides accordingly (e.g. for data entry or study initialization).  This means the card form, the study picker and the card list show the deck’s labels (e.g., “Phonetic”, “Meaning”) instead of “Side 2”, “Side 3”.
@@ -153,43 +153,9 @@ For desktop/non-touch browsers or accessibility, dedicated UI buttons with visua
 
 * Tapping the card also turns to the next side.
 
-# **5 System Architecture & Technical Stack**
+# **5 Scope & Feature Roadmap**
 
-FlipStack is designed as a cloud-first, mobile-optimized Web Application with client-side offline storage capabilities.
-
-\+-------------------------------------------------------------------+  
-|                        FLIPSTACK ARCHITECTURE                     |  
-\+-------------------------------------------------------------------+  
-|  Client Layer:  PWA Web App (Vue 3 / Tailwind) \+ IndexedDB        |  
-|  Auth & Backend: Supabase Auth (Email / Password / OAuth)         |  
-|  Database Layer: PostgreSQL \+ Row-Level Security (RLS)            |  
-\+-------------------------------------------------------------------+
-
-## **5.1 Architecture Components**
-
-**Frontend Client:**
-
-* Mobile-first Progressive Web App (PWA) installable on iOS and Android home screens.  
-* Built with Vue.js 3 and Tailwind CSS.  
-* Responsive swipe gesture engine for touch interactions.
-
-**Backend & Authentication (Supabase):**
-
-* **Authentication:** User signup, sign-in, session token management, and password management. For MVP we implement the sign in only, users are created directly in Supabase.  
-* **Database:** Managed PostgreSQL instance housing profiles, decks, and cards plus the progress (counter) table described in 2.3.  
-* **Row-Level Security (RLS):** Database-level security policies enforcing that users can only read, write, update, or delete their own data (user\_id \= auth.uid()).
-
-**Offline & Data Storage Strategy:**
-
-* **Cloud Sync (Primary):** Data is seamlessly synced with Supabase when online.  
-* **IndexedDB (Offline Layer):** Decks and cards are cached locally in browser storage (IndexedDB) to allow offline study sessions on mobile devices.  
-* Offline Data Entry is not supported. (Show a message: „please connect to the Internet“)  
-* Because counters change on every swipe, they are stored locally while offline and synced when back online. For a single user the newest change per card and direction wins.  
-* **Tip:** Safari on iPhone can delete stored website data after about a week of non-use unless the app is installed to the home screen; the app should be installed, and the cloud sync is the safety net.
-
-# **6 Scope & Feature Roadmap**
-
-## **6.1 MVP (Phase 1\)**
+## **5.1 MVP (Phase 1\)**
 
 * Mobile-first responsive Web application UI (PWA enabled).  
 * User authentication (Login) with private user data isolation via Supabase RLS. Login only for now; the sign-up screen is deferred.  
@@ -205,7 +171,7 @@ FlipStack is designed as a cloud-first, mobile-optimized Web Application with cl
 * Tags as the way to choose a learning topic.  
 * One-time import of the existing V0 word list directly into the database (outside the app, no import function in the app). The V0 list is plain text with Phonetic and English (sometimes German) separated by a dash. The import splits each line on the first “ \- ” (dash with spaces), since romanizations can contain hyphens.
 
-## **6.2 Future Enhancements (Phase 2 & Beyond)**
+## **5.2 Future Enhancements (Phase 2 & Beyond)**
 
 * **Desktop UX:** Expanded layout with hotkey bindings (Space \= Flip, Up Arrow \= Got It, Down Arrow \= Needs Review).  
 * **Bulk Import / Export:** CSV/JSON import for easy deck population. The first word list is imported directly into the database; an in-app import is not needed for that. Export/import remains the only way sharing could work (see 2.2).  
@@ -218,8 +184,9 @@ FlipStack is designed as a cloud-first, mobile-optimized Web Application with cl
 ## **Out of scope**
 
 * **Inline deck sharing:** (the technical and rule-definition effort of shared decks does not meet the gain.)
+* **Offline Data Entry** is not supported. (Show a message: „please connect to the Internet“)
 
-# **7 Open Points**
+# **6 Open Points**
 
 These came up during the review and were not decided. They are listed here so nothing is lost.
 
