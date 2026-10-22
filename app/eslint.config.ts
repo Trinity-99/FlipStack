@@ -4,6 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import pluginVitest from '@vitest/eslint-plugin'
 import pluginOxlint from 'eslint-plugin-oxlint'
 import skipFormatting from 'eslint-config-prettier/flat'
+import type { Rule } from 'eslint'
 
 // To allow more languages other than `ts` in `.vue` files, uncomment the following lines:
 // import { configureVueProject } from '@vue/eslint-config-typescript'
@@ -27,6 +28,38 @@ export default defineConfigWithVueTs(
   },
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
+
+{
+    plugins: {
+        local: {
+          rules: {
+            'no-try-catch-fallback': {
+              create(context: Rule.RuleContext): Rule.NodeListener {
+                return {
+                  CatchClause(node : Rule.Node) {
+                    if (node.type === 'CatchClause') {
+                      const body = node.body.body;
+                      if (body.length === 1 && body[0].type === 'ReturnStatement') {
+                        context.report({
+                          node,
+                          message: 'Avoid using try/catch blocks for control flow or returning fallback values.'
+                        });
+                    }
+                  }
+                }
+              };
+            }
+          }
+        }
+      }
+    },
+    rules: {
+      'local/no-try-catch-fallback': 'error',
+
+      //  DISABLE RULES GLOBALLY HERE
+      '@typescript-eslint/no-explicit-any': 'warn'
+    }
+  },
 
   skipFormatting,
 )

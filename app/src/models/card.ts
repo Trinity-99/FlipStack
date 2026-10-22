@@ -1,4 +1,5 @@
 import { supabase } from '@/db/supabase'
+import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 /**
  * @summary Represents the content structure of a 3-sided study card.
@@ -34,6 +35,7 @@ export class Card {
       );
       return filledSides.length >= 2;
     } catch (error) {
+      console.error('Error checking if card is study-ready:', error);
       return false;
     }
   }
@@ -95,7 +97,7 @@ export class Card {
 
       // Sync tags in the card_tag junction table
       await this.syncTags(cardId!);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Card.save failed:', error);
       throw error;
     }
@@ -153,7 +155,7 @@ export class Card {
       if (error) {
         throw new Error(`Database error while deleting card: ${error.message}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Card.delete failed for ID ${this.id}:`, error);
       throw error;
     }
@@ -188,7 +190,7 @@ export class Card {
       const tagIds = await Card.fetchTagIdsForCard(cardId);
 
       return Card.fromJSON(data, tagIds);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Card.findById failed for ID ${cardId}:`, error);
       throw error;
     }
@@ -238,7 +240,7 @@ export class Card {
       }
 
       return data.map(row => Card.fromJSON(row, tagMap.get(row.id) || []));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Card.findAllForDeck failed:', error);
       throw error;
     }
@@ -262,27 +264,44 @@ export class Card {
 
   /**
    * @summary Instantiates a Card object from a raw database record and associated tag IDs.
-   * @param {any} json - The raw database JSON object from Supabase.
+   * @param {unknown} json - The raw database JSON object from Supabase.
    * @param {string[] } [tagIds=[]] - Optional array of associated tag UUIDs.
    * @returns {Card} A fully typed Card instance.
    * @throws {Error} If required fields are missing from the raw data.
    */
-  public static fromJSON(json: any, tagIds: string[] = []): Card {
-    if (!json || !json.id || !json.deck_id || !json.user_id) {
-      throw new Error('Invalid raw data: Missing required fields to parse Card.');
+  public static fromJSON(json: unknown, tagIds: string[] = []): Card {
+    if (!isDatabaseRecord(json)) {
+      throw new Error('Invalid raw data: Cannot parse Card from a non-object value.')
     }
     try {
+      const content = json.content
+      if (content !== undefined && content !== null && !isDatabaseRecord(content)) {
+        throw new Error('Invalid raw data: Invalid content to parse Card.')
+      }
+
+      const cardContent = content ? Object.fromEntries(
+        Object.entries(content).map(([key, value]) => {
+          if (key !== 's1' && key !== 's2' && key !== 's3') {
+            throw new Error(`Invalid raw data: Invalid card side ${key}.`)
+          }
+          if (typeof value !== 'string') {
+            throw new Error(`Invalid raw data: Invalid card content for ${key}.`)
+          }
+          return [key, value]
+        })
+      ) as CardContent : {}
+
       return new Card(
-        json.id,
-        json.deck_id,
-        json.user_id,
-        json.content || {},
+        requiredString(json, 'id', 'Card'),
+        requiredString(json, 'deck_id', 'Card'),
+        requiredString(json, 'user_id', 'Card'),
+        cardContent,
         tagIds,
-        json.created_at ? new Date(json.created_at) : null,
-        json.updated_at ? new Date(json.updated_at) : null
-      );
-    } catch (error: any) {
-      throw new Error(`Failed to parse Card from JSON: ${error.message}`);
+        optionalDate(json, 'created_at', 'Card'),
+        optionalDate(json, 'updated_at', 'Card')
+      )
+    } catch (error: unknown) {
+      throw new Error(`Failed to parse Card from JSON: ${errorMessage(error)}`)
     }
   }
 }

@@ -1,4 +1,5 @@
 import { supabase } from '@/db/supabase'
+import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 /**
  * @summary Represents learning progress counters (0–10) per user, card, and direction with active record persistence.
@@ -80,7 +81,7 @@ export class CardProgress {
         counter: data.counter,
         lastUpdated: new Date(data.last_updated),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('CardProgress.save failed:', error);
       throw error;
     }
@@ -105,7 +106,7 @@ export class CardProgress {
       if (error) {
         throw new Error(`Database error while deleting card progress: ${error.message}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`CardProgress.delete failed for ID ${this.id}:`, error);
       throw error;
     }
@@ -143,7 +144,7 @@ export class CardProgress {
       }
 
       return data ? CardProgress.fromJSON(data) : null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('CardProgress.findForUserCardAndDirection failed:', error);
       throw error;
     }
@@ -151,25 +152,30 @@ export class CardProgress {
 
   /**
    * @summary Instantiates a CardProgress object from a raw database record.
-   * @param {any} json - The raw database JSON object from Supabase.
+   * @param {unknown} json - The raw database JSON object from Supabase.
    * @returns {CardProgress} A fully typed CardProgress instance.
    * @throws {Error} If required fields are missing from the raw data.
    */
-  public static fromJSON(json: any): CardProgress {
-    if (!json || !json.id || !json.user_id || !json.card_id || !json.direction_id) {
-      throw new Error('Invalid raw data: Missing required fields to parse CardProgress.');
+  public static fromJSON(json: unknown): CardProgress {
+    if (!isDatabaseRecord(json)) {
+      throw new Error('Invalid raw data: Cannot parse CardProgress from a non-object value.')
     }
     try {
+      const counter = json.counter ?? 0
+      if (typeof counter !== 'number' || !Number.isFinite(counter)) {
+        throw new Error('Invalid raw data: Invalid counter to parse CardProgress.')
+      }
+
       return new CardProgress(
-        json.id,
-        json.user_id,
-        json.card_id,
-        json.direction_id,
-        json.counter ?? 0,
-        new Date(json.last_updated || Date.now())
-      );
-    } catch (error: any) {
-      throw new Error(`Failed to parse CardProgress from JSON: ${error.message}`);
+        requiredString(json, 'id', 'CardProgress'),
+        requiredString(json, 'user_id', 'CardProgress'),
+        requiredString(json, 'card_id', 'CardProgress'),
+        requiredString(json, 'direction_id', 'CardProgress'),
+        counter,
+        optionalDate(json, 'last_updated', 'CardProgress') ?? new Date()
+      )
+    } catch (error: unknown) {
+      throw new Error(`Failed to parse CardProgress from JSON: ${errorMessage(error)}`)
     }
   }
 }

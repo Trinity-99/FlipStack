@@ -1,4 +1,5 @@
 import { supabase } from '@/db/supabase'
+import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 /**
  * @summary Represents a study deck containing user-defined side labels and active record persistence.
@@ -79,7 +80,7 @@ export class Deck {
           updatedAt: new Date(data.updated_at),
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Deck.save failed:', error);
       throw error;
     }
@@ -104,7 +105,7 @@ export class Deck {
       if (error) {
         throw new Error(`Database error while deleting deck: ${error.message}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Deck.delete failed for ID ${this.id}:`, error);
       throw error;
     }
@@ -134,7 +135,7 @@ export class Deck {
       }
 
       return data ? Deck.fromJSON(data) : null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Deck.findById failed for ID ${deckId}:`, error);
       throw error;
     }
@@ -162,8 +163,8 @@ export class Deck {
         throw new Error(`Database error while fetching user decks: ${error.message}`);
       }
 
-      return (data || []).map((row: any) => Deck.fromJSON(row));
-    } catch (error: any) {
+      return (data || []).map(row => Deck.fromJSON(row));
+    } catch (error: unknown) {
       console.error('Deck.findAllForUser failed:', error);
       throw error;
     }
@@ -171,25 +172,31 @@ export class Deck {
 
   /**
    * @summary Instantiates a Deck object from a raw database record.
-   * @param {any} json - The raw database JSON object from Supabase.
+   * @param {unknown} json - The raw database JSON object from Supabase.
    * @returns {Deck} A fully typed Deck instance.
    * @throws {Error} If required fields are missing from the raw data.
    */
-  public static fromJSON(json: any): Deck {
-    if (!json || !json.id || !json.user_id) {
-      throw new Error('Invalid raw data: Missing required fields to parse Deck.');
+  public static fromJSON(json: unknown): Deck {
+    if (!isDatabaseRecord(json)) {
+      throw new Error('Invalid raw data: Cannot parse Deck from a non-object value.')
     }
     try {
+      const sideLabels = json.side_labels
+      if (sideLabels !== undefined && sideLabels !== null &&
+        (!Array.isArray(sideLabels) || !sideLabels.every((label): label is string => typeof label === 'string'))) {
+        throw new Error('Invalid raw data: Invalid side_labels to parse Deck.')
+      }
+
       return new Deck(
-        json.id,
-        json.user_id,
-        json.title,
-        json.side_labels || ['Side 1', 'Side 2', 'Side 3'],
-        json.created_at ? new Date(json.created_at) : null,
-        json.updated_at ? new Date(json.updated_at) : null
-      );
-    } catch (error: any) {
-      throw new Error(`Failed to parse Deck from JSON: ${error.message}`);
+        requiredString(json, 'id', 'Deck'),
+        requiredString(json, 'user_id', 'Deck'),
+        requiredString(json, 'title', 'Deck'),
+        sideLabels ?? ['Side 1', 'Side 2', 'Side 3'],
+        optionalDate(json, 'created_at', 'Deck'),
+        optionalDate(json, 'updated_at', 'Deck')
+      )
+    } catch (error: unknown) {
+      throw new Error(`Failed to parse Deck from JSON: ${errorMessage(error)}`)
     }
   }
 }

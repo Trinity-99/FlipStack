@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import TestView from '@/views/Test.vue'
+import TestView from '@/views/Test-FlipStack.vue'
 
 const routes = [
   {

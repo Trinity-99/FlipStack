@@ -1,4 +1,5 @@
 import { supabase } from '@/db/supabase'
+import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 /**
  * @summary Represents a learning topic tag associated with a deck with active record persistence.
@@ -56,7 +57,7 @@ export class Tag {
           throw new Error(`Database error while updating tag: ${error?.message || 'No data returned'}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Tag.save failed:', error);
       throw error;
     }
@@ -81,7 +82,7 @@ export class Tag {
       if (error) {
         throw new Error(`Database error while deleting tag: ${error.message}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Tag.delete failed for ID ${this.id}:`, error);
       throw error;
     }
@@ -111,7 +112,7 @@ export class Tag {
       }
 
       return data ? Tag.fromJSON(data) : null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Tag.findById failed for ID ${tagId}:`, error);
       throw error;
     }
@@ -139,8 +140,8 @@ export class Tag {
         throw new Error(`Database error while fetching deck tags: ${error.message}`);
       }
 
-      return (data || []).map((row: any) => Tag.fromJSON(row));
-    } catch (error: any) {
+      return (data || []).map(row => Tag.fromJSON(row));
+    } catch (error: unknown) {
       console.error('Tag.findAllForDeck failed:', error);
       throw error;
     }
@@ -148,23 +149,23 @@ export class Tag {
 
   /**
    * @summary Instantiates a Tag object from a raw database record.
-   * @param {any} json - The raw database JSON object from Supabase.
+   * @param {unknown} json - The raw database JSON object from Supabase.
    * @returns {Tag} A fully typed Tag instance.
    * @throws {Error} If required fields are missing from the raw data.
    */
-  public static fromJSON(json: any): Tag {
-    if (!json || !json.id || !json.deck_id || !json.name) {
-      throw new Error('Invalid raw data: Missing required fields to parse Tag.');
+  public static fromJSON(json: unknown): Tag {
+    if (!isDatabaseRecord(json)) {
+      throw new Error('Invalid raw data: Cannot parse Tag from a non-object value.')
     }
     try {
       return new Tag(
-        json.id,
-        json.deck_id,
-        json.name,
-        json.created_at ? new Date(json.created_at) : null
+        requiredString(json, 'id', 'Tag'),
+        requiredString(json, 'deck_id', 'Tag'),
+        requiredString(json, 'name', 'Tag'),
+        optionalDate(json, 'created_at', 'Tag')
       );
-    } catch (error: any) {
-      throw new Error(`Failed to parse Tag from JSON: ${error.message}`);
+    } catch (error: unknown) {
+      throw new Error(`Failed to parse Tag from JSON: ${errorMessage(error)}`)
     }
   }
 }

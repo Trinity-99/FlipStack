@@ -1,5 +1,6 @@
 import { supabase } from '@/db/supabase'
 import { Card } from '@/models/card'
+import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 export type SideRole = 'question' | 'answer' | 'extra';
 
@@ -64,7 +65,7 @@ export class Direction {
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error evaluating card eligibility:', error);
       return false;
     }
@@ -115,7 +116,7 @@ export class Direction {
           throw new Error(`Database error while updating direction: ${error?.message || 'No data returned'}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Direction.save failed:', error);
       throw error;
     }
@@ -140,7 +141,7 @@ export class Direction {
       if (error) {
         throw new Error(`Database error while deleting direction: ${error.message}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Direction.delete failed for ID ${this.id}:`, error);
       throw error;
     }
@@ -170,7 +171,7 @@ export class Direction {
       }
 
       return data ? Direction.fromJSON(data) : null;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Direction.findById failed for ID ${directionId}:`, error);
       throw error;
     }
@@ -198,8 +199,8 @@ export class Direction {
         throw new Error(`Database error while fetching deck directions: ${error.message}`);
       }
 
-      return (data || []).map((row: any) => Direction.fromJSON(row));
-    } catch (error: any) {
+      return (data || []).map(row => Direction.fromJSON(row));
+    } catch (error: unknown) {
       console.error('Direction.findAllForDeck failed:', error);
       throw error;
     }
@@ -207,23 +208,36 @@ export class Direction {
 
   /**
    * @summary Instantiates a Direction object from a raw database record.
-   * @param {any} json - The raw database JSON object from Supabase.
+   * @param {unknown} json - The raw database JSON object from Supabase.
    * @returns {Direction} A fully typed Direction instance.
    * @throws {Error} If required fields are missing from the raw data.
    */
-  public static fromJSON(json: any): Direction {
-    if (!json || !json.id || !json.deck_id || !json.configuration) {
-      throw new Error('Invalid raw data: Missing required fields to parse Direction.');
+  public static fromJSON(json: unknown): Direction {
+    if (!isDatabaseRecord(json)) {
+      throw new Error('Invalid raw data: Cannot parse Direction from a non-object value.')
     }
     try {
+      const rawConfiguration = json.configuration
+      if (!Array.isArray(rawConfiguration)) {
+        throw new Error('Invalid raw data: Invalid configuration to parse Direction.')
+      }
+      const configuration = rawConfiguration.map((step): DirectionStep => {
+        if (!isDatabaseRecord(step) ||
+          (step.side !== 1 && step.side !== 2 && step.side !== 3) ||
+          (step.role !== 'question' && step.role !== 'answer' && step.role !== 'extra')) {
+          throw new Error('Invalid raw data: Invalid direction step to parse Direction.')
+        }
+        return { side: step.side, role: step.role }
+      })
+
       return new Direction(
-        json.id,
-        json.deck_id,
-        json.configuration as DirectionStep[],
-        json.created_at ? new Date(json.created_at) : null
-      );
-    } catch (error: any) {
-      throw new Error(`Failed to parse Direction from JSON: ${error.message}`);
+        requiredString(json, 'id', 'Direction'),
+        requiredString(json, 'deck_id', 'Direction'),
+        configuration,
+        optionalDate(json, 'created_at', 'Direction')
+      )
+    } catch (error: unknown) {
+      throw new Error(`Failed to parse Direction from JSON: ${errorMessage(error)}`)
     }
   }
 }

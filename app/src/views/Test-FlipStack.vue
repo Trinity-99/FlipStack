@@ -31,9 +31,9 @@ const runSmokeTest = async () => {
 
     testStatus.value = 'success'
     addLog('🎉 All connection tests passed successfully! Supabase is fully reachable.')
-  } catch (error: any) {
+  } catch (error: unknown) {
     testStatus.value = 'error'
-    addLog(`❌ Database connection test failed: ${error.message || error}`)
+    addLog(`❌ Database connection test failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
