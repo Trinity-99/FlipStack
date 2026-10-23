@@ -1,127 +1,86 @@
-# FlipStack Project Coding Guidelines
+# FlipStack — Coding Guidelines
 
-This document establishes the official architectural, design, and coding standards for the FlipStack application. All developers and AI coding assistants must strictly adhere to these guidelines to ensure consistency, maintainability, and clean object-oriented architecture across the codebase.
+These guidelines define how code is written in FlipStack. The structure of the system is described in the Architecture document.
 
----
+## 1 General
 
-## 1. Architectural Pattern: Pure Active Record
+- **Formatting:** Prettier with no semicolons, single quotes and 2-space indentation.
+- **Linting:** ESLint with the recommended Vue and TypeScript rules.
+- Formatting and linting run automatically and must pass without errors.
+- TypeScript runs in `strict` mode.
+- Imports from `src` use the `@/` alias.
+- **Naming:**
+  - Classes, types, interfaces and Vue components: `PascalCase`
+  - Variables, functions and methods: `camelCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - TypeScript files: `camelCase` (e.g. `cardProgress.ts`)
+  - Vue component files: `PascalCase` (e.g. `DeckList.vue`)
 
-FlipStack follows a **Pure Active Record Pattern**. 
+## 2 TypeScript
 
-- **Self-Contained Domain Models:** Models represent both the domain logic and database operations. They encapsulate properties, domain behaviors, and direct persistence mechanisms via `@supabase/supabase-js`.
-- **No Separate Service/Repository Layer:** Controllers, stores, and UI views interact directly with domain models (`await deck.save()`, `await Card.findById(id)`). There is no intermediary database service or repository layer for CRUD operations.
-
----
-
-## 2. Domain Model Structure & Encapsulation
-
-### File Location
-All domain model classes reside under `app/src/models/` (e.g., `app/src/models/deck.ts`, `app/src/models/card.ts`).
-
-### Immutability & Identifiers
-- Database-managed identifiers (`id`, `userId`, `deckId`, etc.) are declared as `public readonly`.
-  - **`public`**: Enables UI templates, router parameters, and component logic to inspect entity IDs without boilerplate getters.
-  - **`readonly`**: Prevents accidental mutation or identity tampering post-instantiation.
-- New/unsaved domain entities use `string | null` for their `id` property until persisted to the database.
-
-### True Object-Oriented Methods
-- Domain methods accept full **domain model instances** instead of raw JSON or primitive fields.
-  - **Correct:** `direction.isCardEligible(card: Card)`
-  - **Incorrect:** `direction.isCardEligible(cardContent: Record<string, string>)`
-- Domain objects shield callers from internal structural details.
-
-### Static Serialization & Factory Methods
-Every model must implement a static `fromJSON` factory method:
-- Accepts raw database JSON returned by Supabase queries.
-- Parses dates (`created_at`, `updated_at`, `last_updated`) into JS `Date` instances.
-- Instantiates and returns a strongly-typed model instance.
-- Performs runtime validation and throws descriptive errors if required attributes are missing.
-
-### Standardized Persistence Interface
-Every domain model must implement the following lifecycle and static query methods:
-- **`save(): Promise<void>`**  
-  - Handles both **INSERT** (when `id === null`) and **UPDATE** (when `id` exists).
-  - Mutates the instance upon insertion using `Object.assign(this, { id, createdAt, updatedAt })`.
-  - Handles relational child syncs (e.g., `card_tag` junction table updates) within the same invocation.
-- **`delete(): Promise<void>`**  
-  - Removes the entity from the database. Throws if the instance has no assigned `id`.
-- **`static findById(id: string): Promise<Model | null>`**  
-  - Fetches a single record. Handles PostgreSQL code `PGRST116` (not found) gracefully by returning `null`.
-- **`static findAllFor[Parent](parentId: string): Promise<Model[]>`**  
-  - Fetches collections associated with parent entities (e.g., `findAllForUser(userId)`, `findAllForDeck(deckId)`). Returns an empty array `[]` if no matching records exist.
-
----
-
-## 3. Documentation & Type Safety Standards
-
-### JSDoc Annotation Format
-All classes, constructor parameters, public methods, and static methods must be documented using standardized JSDoc blocks:
+- `any` is not allowed, explicit or implicit. Use `unknown` and narrow it (e.g. in `catch`), and typed interfaces for external data such as database rows.
+- All parameters and return types are explicitly typed (e.g. `Promise<Deck[]>`, `void`).
+- Fixed sets of values are union types, e.g. `export type SideRole = 'question' | 'answer' | 'extra'`.
+- Use `const` by default; `let` only when a value is reassigned; never `var`.
+- Use `readonly` for values that must not change after creation.
+- **JSDoc:** every class, constructor parameter, public method and static method has a JSDoc block:
 
 ```typescript
 /**
  * @summary Brief summary of the class or method purpose.
  * @param {string} parameterName - Description of the parameter.
  * @returns {Promise<Card | null>} Description of the return value.
- * @throws {Error} Description of conditions under which errors are thrown.
+ * @throws {Error} Conditions under which an error is thrown.
  */
 ```
 
-### Explicit Typing
-- Implicit `any` is strictly prohibited.
-- All method parameters and return types must be explicitly typed (e.g., `Promise<Deck[]>`, `Promise<Direction | null>`, `void`).
-- Database side fields and roles are explicitly typed using TypeScript unions (e.g., `export type SideRole = 'question' | 'answer' | 'extra';`).
+## 3 Vue.js
 
-### Defensive Validation & Error Handling
-- Validate all incoming parameters and required fields before issuing Supabase network requests.
-- Throw explicit, descriptive `Error` instances if invariants are violated (e.g., missing required properties on `save()`).
-- Wrap external Supabase calls in `try...catch` blocks and log context-rich errors via `console.error`.
+- Use the Composition API with `<script setup lang="ts">`. No Options API.
+- Props and emits are typed: `defineProps<{ ... }>()` and `defineEmits<{ ... }>()`.
+- Components are small and have one responsibility. Reusable logic goes into composables named `useXyz`.
+- State shared between components lives in Pinia stores, written in setup syntax (`defineStore('name', () => { ... })`). State used by one component stays in that component (`ref`, `reactive`).
+- Derived values use `computed`; they are never stored as separate state.
+- `v-for` always has a stable `:key`. Never combine `v-if` and `v-for` on the same element.
+- Views are lazy-loaded in the router.
+- Style with Tailwind utility classes in the template. Custom CSS only when utilities are not enough, then in `<style scoped>`.
+- Use semantic HTML for interaction (e.g. `<button>`, not a clickable `<div>`).
 
----
+**Styling**
 
-## 4. Database & SQL Conventions
+- Style with Tailwind utility classes in the template. 
+- Custom theme tokens (colors, radii, spacing) must be defined in `src/assets/main.css` within the `@theme` block, following the Tailwind v4 CSS-first configuration standard.
+- Custom CSS is allowed only when utility classes are insufficient, and must be placed in `<style scoped>` blocks.
 
-### Naming Conventions
-- **Table Names:** Lowercase singular nouns (`profile`, `deck`, `card`, `direction`, `tag`, `card_tag`, `card_progress`).
-- **Column Names:** Lowercase snake_case (`user_id`, `deck_id`, `created_at`, `updated_at`, `last_updated`).
 
-### Identifiers
-- Primary keys must use UUID v4 auto-generation (`id uuid PRIMARY KEY DEFAULT uuid_generate_v4()`).
-- Auto-incrementing integer IDs are prohibited to ensure PWA offline creation compatibility and avoid enumeration attacks.
+## 4 Data Layer
 
-### Row Level Security (RLS)
-- RLS must be enabled on all database tables (`ALTER TABLE <table_name> ENABLE ROW LEVEL SECURITY;`).
-- RLS policies must strictly verify user ownership using `auth.uid()` (e.g., `user_id = auth.uid()` or via parent deck ownership checks).
+**Models**
 
-### Automated Triggers
-- Tables with timestamp tracking must feature an `UPDATE` trigger that automatically sets `updated_at = NOW()`.
-- An `auth.users` trigger (`on_auth_user_created`) automatically populates the `profile` table upon user registration.
+- Domain models live in `src/models/`, one file per model, named after the class in `camelCase`.
+- Database-managed identifiers (`id`, `userId`, `deckId`, ...) are `public readonly`. An unsaved entity has `id: string | null`.
+- Domain methods take domain objects, not raw JSON or primitives: `isCardEligible(card: Card, direction: Direction)`, not `isCardEligible(content: Record<string, string>)`.
+- A model contains logic about itself only. Logic across several models belongs in the study engine.
 
----
+**Required methods**
 
-## 5. Directory Structure & Supabase Client
+- `static fromJSON(row)`: takes the typed database row, parses dates into `Date`, validates required attributes and throws a descriptive error if one is missing. Returns a typed instance.
+- `save(): Promise<void>`: INSERT when `id === null`, otherwise UPDATE. After an insert it assigns `id`, `createdAt` and `updatedAt` with `Object.assign(this, { ... })`. Related child records (e.g. `card_tag`) are synced in the same call.
+- `delete(): Promise<void>`: throws if the instance has no `id`.
+- `static findById(id): Promise<Model | null>`: returns `null` when not found (PostgreSQL code `PGRST116`).
+- `static findAllFor<Parent>(parentId): Promise<Model[]>`: returns `[]` when nothing matches (e.g. `findAllForUser`, `findAllForDeck`).
+- Models that the database creates itself (e.g. `Profile`) are read-only and implement `fromJSON` only.
 
-```
-app/
-├── src/
-│   ├── db/
-│   │   └── supabase.ts      # Pure Supabase client initialization
-│   ├── models/              # Active Record Domain Models
-│   │   ├── card.ts
-│   │   ├── cardProgress.ts
-│   │   ├── deck.ts
-│   │   ├── direction.ts
-│   │   ├── profile.ts
-│   │   └── tag.ts
-│   ├── router/
-│   │   └── index.ts         # Vue Router setup
-│   ├── views/               # Page/View components
-│   │   └── Test.vue         # Database smoke test & verification route
-│   ├── App.vue              # Main Vue application root
-│   └── main.ts              # Application entry point
-```
+**Validation and errors**
 
-### Supabase Client Setup
-- `app/src/db/supabase.ts` is strictly responsible for initializing and exporting the `supabase` client instance using environment variables:
-  - `import.meta.env.VITE_SUPABASE_URL`
-  - `import.meta.env.VITE_SUPABASE_ANON_KEY`
-- No data fetching logic, service layer code, or state management may be placed inside `app/src/db/`.
+- Validate parameters and required fields before any network request.
+- Throw descriptive `Error` instances when an invariant is violated.
+- Wrap Supabase calls in `try...catch`, log with context via `console.error`, and rethrow.
+
+## 5 Database / SQL
+
+- **Tables:** lowercase singular nouns (`deck`, `card_progress`).
+- **Columns:** lowercase `snake_case` (`user_id`, `created_at`).
+- **Primary keys:** UUID v4, generated by the database. No auto-increment integers.
+- **Row-Level Security** is enabled on every table. Policies check ownership with `auth.uid()`, directly via `user_id` or through the parent record.
+- Tables with an `updated_at` column have a trigger that sets it automatically.

@@ -1,1 +1,31 @@
 @import "tailwindcss";
+@import "tailwindcss/theme" reference;
+
+@theme {
+  --color-app: #0B0F19;
+  --color-card: #1E293B;
+  --color-surface-muted: #334155;
+  --color-primary: #F8FAFC;
+  --color-secondary: #94A3B8;
+  --color-muted: #64748B;
+  --color-border-subtle: #334155;
+  --color-accent-got-it: #22C55E;
+  --color-accent-review: #F43F5E;
+  --color-brand-primary: #6366F1;
+
+  /* Alert Banner Colors */
+  --color-rose-300: #FDA4AF;
+  --color-rose-200: #FECDD3;
+  --color-emerald-300: #6EE7B7;
+  --color-indigo-300: #A5B4FC;
+  --color-amber-300: #FCD34D;
+
+  --radius-card: 1.5rem;
+  --radius-pill: 0.75rem;
+}
+
+@layer base {
+  body {
+    @apply bg-app text-primary;
+  }
+}
