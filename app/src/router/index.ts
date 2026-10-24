@@ -4,8 +4,8 @@ import TestView from '@/views/Test-FlipStack.vue'
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: TestView, // For now, point root to TestView so you see it immediately!
+    name: 'Login',
+    component: () => import('@/views/LoginView.vue'),
   },
   {
     path: '/test',
