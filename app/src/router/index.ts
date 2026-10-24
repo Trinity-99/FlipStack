@@ -27,11 +27,12 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/decks/new',
         name: 'DeckCreate',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
-        meta: {
-          placeholderTitle: 'Create a Deck',
-          placeholderDescription: 'Set up a new deck and choose labels for its sides.',
-        },
+        component: () => import('@/views/DeckEditView.vue'),
+      },
+      {
+        path: '/decks/:deckId/edit',
+        name: 'DeckEdit',
+        component: () => import('@/views/DeckEditView.vue'),
       },
       {
         path: '/cards/new',

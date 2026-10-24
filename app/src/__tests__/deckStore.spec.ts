@@ -98,6 +98,52 @@ describe('useDeckStore', () => {
     expect(cardStore.loadedDeckId).toBeNull()
   })
 
+  it('adds a saved deck to its cache', () => {
+    const store = useDeckStore()
+    const newDeck = new Deck(
+      'deck-created',
+      'user-1',
+      'New deck',
+      ['Script', 'Meaning'],
+      null,
+      null,
+    )
+
+    store.upsertDeck(newDeck)
+
+    expect(store.decks).toEqual([newDeck])
+    expect(store.activeDeckId).toBeNull()
+  })
+
+  it('replaces an existing deck in its cache without changing other decks', () => {
+    const store = useDeckStore()
+    const unchangedDeck = userDecks[1]
+    const updatedDeck = new Deck(
+      'deck-newer',
+      'user-1',
+      'Updated',
+      ['Script', 'Meaning'],
+      null,
+      null,
+    )
+    store.decks = userDecks
+    store.activeDeckId = updatedDeck.id
+
+    store.upsertDeck(updatedDeck)
+
+    expect(store.decks).toEqual([updatedDeck, unchangedDeck])
+    expect(store.activeDeck).toBe(updatedDeck)
+  })
+
+  it('rejects an unsaved deck', () => {
+    const store = useDeckStore()
+    const unsavedDeck = new Deck(null, 'user-1', 'New deck', ['Script', 'Meaning'], null, null)
+
+    expect(() => store.upsertDeck(unsavedDeck)).toThrow(
+      'Cannot add a deck to the cache before it has been saved.',
+    )
+  })
+
   it('retries initialization after deck data fails to load', async () => {
     const profile = new Profile('user-1', createdAt, createdAt, 'deck-newer')
     useAuthStore().setAuthenticated(profile, {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Session } from '@supabase/supabase-js'
 import { Profile } from '@/models/profile'
@@ -21,6 +21,10 @@ const session: Session = {
 describe('useAuthStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('starts unauthenticated and stores a successful login', () => {
@@ -47,5 +51,31 @@ describe('useAuthStore', () => {
     expect(store.profile).toBe(updatedProfile)
     expect(store.session).toBe(session)
     expect(store.isAuthenticated).toBe(true)
+  })
+
+  it('restores the persisted profile and session', async () => {
+    const restoredProfile = new Profile('user-1', new Date(), new Date())
+    vi.spyOn(Profile, 'restoreAuthentication').mockResolvedValue({
+      profile: restoredProfile,
+      session,
+    })
+    const store = useAuthStore()
+
+    await store.restoreAuthentication()
+
+    expect(store.profile).toBe(restoredProfile)
+    expect(store.session).toBe(session)
+    expect(store.isAuthenticated).toBe(true)
+  })
+
+  it('keeps the store unauthenticated when no persisted session exists', async () => {
+    vi.spyOn(Profile, 'restoreAuthentication').mockResolvedValue(null)
+    const store = useAuthStore()
+
+    await store.restoreAuthentication()
+
+    expect(store.profile).toBeNull()
+    expect(store.session).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
   })
 })

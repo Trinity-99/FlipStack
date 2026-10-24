@@ -125,6 +125,28 @@ export const useDeckStore = defineStore('decks', () => {
   }
 
   /**
+   * @summary Adds a saved deck to the cache or replaces its existing entry.
+   * @param {Deck} deck - The persisted deck to synchronize with the cache.
+   * @returns {void}
+   * @throws {Error} If the deck has not been persisted.
+   */
+  function upsertDeck(deck: Deck): void {
+    if (!deck.id) {
+      throw new Error('Cannot add a deck to the cache before it has been saved.')
+    }
+
+    const existingIndex = decks.value.findIndex((cachedDeck) => cachedDeck.id === deck.id)
+    if (existingIndex === -1) {
+      decks.value = [...decks.value, deck]
+      return
+    }
+
+    decks.value = decks.value.map((cachedDeck, index) =>
+      index === existingIndex ? deck : cachedDeck,
+    )
+  }
+
+  /**
    * @summary Switches the active deck after its data and saved preference load successfully.
    * @param {string} deckId - The UUID of the deck to activate.
    * @returns {Promise<void>} A promise that resolves when the deck is active.
@@ -194,6 +216,7 @@ export const useDeckStore = defineStore('decks', () => {
     initialize,
     selectActiveDeck,
     loadActiveDeckData,
+    upsertDeck,
     retryLoad,
   }
 })

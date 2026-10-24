@@ -88,12 +88,12 @@ async function handleSubmit(): Promise<void> {
       </header>
 
       <div
-        v-if="errorMessage"
+        v-if="errorMessage || authStore.initializationError"
         class="mb-6 rounded-xl border border-rose-500/50 bg-rose-950/90 px-4 py-3 text-sm text-rose-300"
         role="alert"
         aria-live="assertive"
       >
-        {{ errorMessage }}
+        {{ errorMessage || authStore.initializationError }}
       </div>
 
       <div

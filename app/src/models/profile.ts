@@ -213,6 +213,31 @@ export class Profile {
   }
 
   /**
+   * @summary Restores the current authenticated profile from the persisted Supabase session.
+   * @returns {Promise<AuthenticationResult | null>} The restored authentication or null when signed out.
+   * @throws {Error} If the session or its profile cannot be loaded.
+   */
+  public static async restoreAuthentication(): Promise<AuthenticationResult | null> {
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        throw new Error(`Failed to restore the authentication session: ${error.message}`)
+      }
+      if (!data.session) return null
+
+      const profile = await Profile.findById(data.session.user.id)
+      if (!profile) {
+        throw new Error(`No profile found for authenticated user ${data.session.user.id}.`)
+      }
+
+      return { profile, session: data.session }
+    } catch (error: unknown) {
+      console.error('Profile.restoreAuthentication failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * @summary Finds a profile by its authenticated user's identifier.
    * @param {string} profileId - The UUID of the profile to find.
    * @returns {Promise<Profile | null>} The matching profile or null when it does not exist.

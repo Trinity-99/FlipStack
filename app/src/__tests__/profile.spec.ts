@@ -2,14 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '@supabase/supabase-js'
 import { Profile } from '@/models/profile'
 
-const { authSignIn, profileFrom } = vi.hoisted(() => ({
+const { authGetSession, authSignIn, profileFrom } = vi.hoisted(() => ({
+  authGetSession: vi.fn<() => Promise<unknown>>(),
   authSignIn: vi.fn<(credentials: { email: string; password: string }) => Promise<unknown>>(),
   profileFrom: vi.fn<(table: string) => unknown>(),
 }))
 
 vi.mock('@/db/supabase', () => ({
   supabase: {
-    auth: { signInWithPassword: authSignIn },
+    auth: { getSession: authGetSession, signInWithPassword: authSignIn },
     from: profileFrom,
   },
 }))
@@ -67,6 +68,26 @@ describe('Profile authentication', () => {
     expect(profileQuery.eq).toHaveBeenCalledWith('id', 'user-1')
     expect(result.profile).toBeInstanceOf(Profile)
     expect(result.session).toBe(session)
+  })
+
+  it('restores the profile from a persisted session', async () => {
+    authGetSession.mockResolvedValue({ data: { session }, error: null })
+
+    const result = await Profile.restoreAuthentication()
+
+    expect(authGetSession).toHaveBeenCalledOnce()
+    expect(profileFrom).toHaveBeenCalledWith('profile')
+    expect(profileQuery.eq).toHaveBeenCalledWith('id', 'user-1')
+    expect(result?.profile).toBeInstanceOf(Profile)
+    expect(result?.session).toBe(session)
+  })
+
+  it('returns null when no persisted session exists', async () => {
+    authGetSession.mockResolvedValue({ data: { session: null }, error: null })
+
+    await expect(Profile.restoreAuthentication()).resolves.toBeNull()
+
+    expect(profileFrom).not.toHaveBeenCalled()
   })
 
   it('maps Supabase invalid-credential errors', async () => {
