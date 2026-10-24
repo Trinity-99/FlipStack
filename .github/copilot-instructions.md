@@ -13,7 +13,7 @@
 
 ## 2 know thy project
 - Familiarize yourself with the project structure and key components.
-- read the PRD.md document in docs/ to understand the project's requirements and architecture design.
+- read the docs/PRD.md document in docs/ to understand the project's requirements and architecture design.
 - Understand the overall goals and objectives of the project.
 
 ## 3 use external knowledge source when appropriate
@@ -23,20 +23,27 @@
 - Always use Exa search and Context7 whenever it makes sense to improve the quality, accuracy, or relevance of your work.
 
 ## 4 Coding principle 
-- yes we follow our coding style but let me repeat:
+- yes we follow our coding style in docs/coding_guidelines.md but let me repeat:
 - Use the project’s established patterns; prefer object-oriented design where it fits,
 - write clean, maintainable, and well-documented code.
 - Follow best practices for code organization and structure.
 - though clean and well structured code is important, we also want to be efficient and pragmatic. don't over-engineer or over-complicate things unnecessarily.
 
-## 5 Testing and Quality Assurance
+## 5 Design and Architecture
+- Follow the project's design and architecture principles.
+- Ensure that new features and changes align with the overall architecture and design patterns and follow the Architecture specifications in docs/Architecture.md.
+- ENsure to follow the design defined in docs/UIDesign.md for any user-facing components.
+- Ensure that good UI/UX design principles are followed for any user-facing components.
+- ENsure to align with the existing design system and style guide for consistency across the application.
+
+## 6 Testing and Quality Assurance
 - Write unit tests for new features and bug fixes to ensure code quality and reliability.
 - Follow the project's testing guidelines and frameworks.
 
-## 6 Documentation
+## 7 Documentation
 - Document code, APIs, and processes clearly and thoroughly to facilitate understanding and maintenance.
 
-## 7 save tokens and be efficient
+## 8 save tokens and be efficient
 - when chatting with 'Master', be mindful of token usage and don't waste tokens on unnecessary calls, roundtrips and verbosity.
 - Be mindful of token usage and optimize code to minimize unnecessary complexity.
 - Avoid redundant code and unnecessary computations. 
