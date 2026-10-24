@@ -1,5 +1,6 @@
 import { supabase } from '@/db/supabase'
 import { Card } from '@/models/card'
+import { Deck } from '@/models/deck'
 import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
 
 export type SideRole = 'question' | 'answer' | 'extra';
@@ -19,6 +20,23 @@ export class Direction {
     public configuration: DirectionStep[],
     public readonly createdAt: Date | null
   ) {}
+
+  /**
+   * @summary Returns the deck side labels used by this direction, in configuration order.
+   * @returns {Promise<string>} A promise resolving to the human-readable name.
+   * @throws {Error} If the deck cannot be found or the lookup fails.
+   */
+  public async getName(): Promise<string> {
+    const deck = await Deck.findById(this.deckId)
+    if (!deck) {
+      throw new Error(`Deck with ID ${this.deckId} not found for direction ${this.id}.`)
+    }
+
+    return this.configuration
+      .map(step => deck.getSideLabel(step.side))
+      .join(' - ')
+  }
+
 
   /**
    * @summary Finds the designated Question step for this direction.

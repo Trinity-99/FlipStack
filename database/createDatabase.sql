@@ -198,3 +198,49 @@ CREATE TRIGGER update_card_updated_at
     BEFORE UPDATE ON public.card
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
     
+
+--  **********************************************************************
+--  V 0.1
+--  New Feature: User Preferences for Decks             
+--  update the database with user preferences
+--
+--  ***********************************************************************
+
+ALTER TABLE public.profile
+ADD COLUMN IF NOT EXISTS last_active_deck_id UUID REFERENCES public.deck(id) ON DELETE SET NULL;
+
+-- 2. Create Per-Deck User Preference Table
+CREATE TABLE IF NOT EXISTS public.user_deck_preference (
+user_id UUID REFERENCES public.profile(id) ON DELETE CASCADE NOT NULL,
+deck_id UUID REFERENCES public.deck(id) ON DELETE CASCADE NOT NULL,
+last_selected_direction_id UUID REFERENCES public.direction(id) ON DELETE SET NULL,
+last_selected_tag_id UUID REFERENCES public.tag(id) ON DELETE SET NULL,
+updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+PRIMARY KEY (user_id, deck_id)
+);
+
+-- ====================================================================
+-- INDEXES & PERFORMANCE
+-- ====================================================================
+
+CREATE INDEX IF NOT EXISTS idx_profile_last_deck ON public.profile(last_active_deck_id);
+CREATE INDEX IF NOT EXISTS idx_user_deck_pref_lookup ON public.user_deck_preference(user_id, deck_id);
+
+-- ====================================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ====================================================================
+
+ALTER TABLE public.user_deck_preference ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can CRUD own deck preferences"
+ON public.user_deck_preference FOR ALL
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- ====================================================================
+-- TRIGGERS
+-- ====================================================================
+
+CREATE TRIGGER update_user_deck_preference_updated_at
+BEFORE UPDATE ON public.user_deck_preference
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
