@@ -35,4 +35,17 @@ describe('useAuthStore', () => {
     expect(store.session).toBe(session)
     expect(store.isAuthenticated).toBe(true)
   })
+
+  it('replaces the profile without clearing the session', () => {
+    const store = useAuthStore()
+    const profile = new Profile('user-1', new Date(), new Date())
+    const updatedProfile = new Profile('user-1', new Date(), new Date(), 'deck-1')
+    store.setAuthenticated(profile, session)
+
+    store.setProfile(updatedProfile)
+
+    expect(store.profile).toBe(updatedProfile)
+    expect(store.session).toBe(session)
+    expect(store.isAuthenticated).toBe(true)
+  })
 })

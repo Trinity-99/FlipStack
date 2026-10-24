@@ -226,7 +226,7 @@ export class Profile {
     try {
       const { data, error } = await supabase
         .from('profile')
-        .select('*')
+        .select('*, user_deck_preferences:user_deck_preference(*)')
         .eq('id', profileId)
         .single()
 

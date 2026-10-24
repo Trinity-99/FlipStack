@@ -122,4 +122,32 @@ describe('Profile authentication', () => {
 
     await expect(Profile.findById('missing-user')).resolves.toBeNull()
   })
+
+  it('loads per-deck preferences with the profile', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    profileQuery.single.mockResolvedValue({
+      data: {
+        ...profileRow,
+        user_deck_preferences: [
+          {
+            deck_id: 'deck-1',
+            last_selected_direction_id: 'direction-1',
+            last_selected_tag_id: 'tag-1',
+          },
+        ],
+      },
+      error: null,
+    })
+
+    const result = await Profile.findById('user-1')
+
+    expect(profileQuery.select).toHaveBeenCalledWith(
+      '*, user_deck_preferences:user_deck_preference(*)',
+    )
+    expect(result?.getDeckPreference('deck-1')).toEqual({
+      deckId: 'deck-1',
+      lastSelectedDirectionId: 'direction-1',
+      lastSelectedTagId: 'tag-1',
+    })
+  })
 })

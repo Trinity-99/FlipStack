@@ -22,5 +22,14 @@ export const useAuthStore = defineStore('auth', () => {
     session.value = authenticatedSession
   }
 
-  return { profile, session, isAuthenticated, setAuthenticated }
+  /**
+   * @summary Replaces the current profile while preserving the authenticated session.
+   * @param {Profile} updatedProfile - The updated user profile.
+   * @returns {void}
+   */
+  function setProfile(updatedProfile: Profile): void {
+    profile.value = updatedProfile
+  }
+
+  return { profile, session, isAuthenticated, setAuthenticated, setProfile }
 })

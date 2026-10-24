@@ -14,4 +14,15 @@ describe('App', () => {
 
     expect(wrapper.text()).toContain('Welcome back')
   })
+
+  it('resolves navigation routes inside the app layout', () => {
+    const cardsRoute = router.resolve('/cards')
+    const studyRoute = router.resolve('/study')
+    const sessionStartRoute = router.resolve('/study/init')
+
+    expect(cardsRoute.name).toBe('CardList')
+    expect(cardsRoute.matched.some((record) => record.name === 'AppLayout')).toBe(true)
+    expect(studyRoute.meta.immersive).toBe(true)
+    expect(sessionStartRoute.name).toBe('SessionStart')
+  })
 })
