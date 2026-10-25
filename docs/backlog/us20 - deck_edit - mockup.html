@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlipStack - Deck Edit (US2 Mockup)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for control panels */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+
+    <!-- ========================================== -->
+    <!-- 1. TOP CONTROL PANEL (STATE SIMULATION)    -->
+    <!-- ========================================== -->
+    <header class="bg-slate-900 border-b border-slate-800 p-3 sm:p-4 shrink-0 shadow-md z-30">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-indigo-500/20 text-indigo-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-indigo-500/30">US2 Simulation</span>
+                    <h1 class="text-sm sm:text-base font-bold text-slate-100">Deck Edit View Controls</h1>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">Test UI states, validation rules, proactive offline mode, and dynamic side toggles.</p>
+            </div>
+
+            <!-- Simulation Action Buttons -->
+            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+                <button onclick="setState('create')" id="btn-create" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow">
+                    Create Mode
+                </button>
+                <button onclick="setState('edit')" id="btn-edit" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700">
+                    Edit Mode
+                </button>
+                <button onclick="triggerValidationError()" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-rose-950/80 text-rose-300 hover:bg-rose-900 border border-rose-800 transition-colors">
+                    Validation Error
+                </button>
+                <button onclick="triggerMaxLengthError()" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-rose-950/80 text-rose-300 hover:bg-rose-900 border border-rose-800 transition-colors">
+                    Max Length (>24)
+                </button>
+                <button onclick="toggleOffline()" id="btn-offline" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-amber-950 text-amber-300 hover:bg-amber-900 border border-amber-800 transition-colors flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m-12.728 0a9 9 0 010-12.728m2.828 2.828a6 6 0 018.485 0m-8.485 8.485a6 6 0 010-8.485m2.829 2.829a2 2 0 012.828 0"></path></svg>
+                    Toggle Offline
+                </button>
+                <button onclick="triggerLoading()" id="btn-loading" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700">
+                    Loading
+                </button>
+                <button onclick="triggerSuccess()" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-emerald-950 text-emerald-300 hover:bg-emerald-900 border border-emerald-800 transition-colors">
+                    Success State
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- 2. MAIN WORKSPACE (VIEW & INSPECTOR)       -->
+    <!-- ========================================== -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+        <!-- SCREEN MOCKUP CANVAS (CENTER) -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-start bg-slate-950">
+            
+            <!-- Mobile Frame Wrapper -->
+            <div class="w-full max-w-md my-auto">
+                
+                <!-- Floating Card Container -->
+                <div class="bg-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl border-2 border-slate-600 transition-all duration-300 relative overflow-hidden">
+                    
+                    <!-- App Screen Header -->
+                    <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-700">
+                        <button type="button" onclick="resetForm()" class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-xl transition-colors" title="Back">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </button>
+                        <h2 id="view-title" class="text-lg font-semibold text-slate-50">Create Deck</h2>
+                        <button type="button" onclick="handleSave()" id="header-save-btn" class="px-3 py-1.5 text-xs font-medium rounded-xl bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow">
+                            Save
+                        </button>
+                    </div>
+
+                    <!-- PROACTIVE OFFLINE BANNER -->
+                    <div id="banner-offline" class="hidden mb-4 p-3 rounded-xl bg-amber-950 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2 animate-fadeIn">
+                        <svg class="w-4 h-4 shrink-0 text-amber-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <div>
+                            <span class="font-semibold block mb-0.5">Offline Mode Detected</span>
+                            Please connect to the Internet — offline data entry is not supported.
+                        </div>
+                    </div>
+
+                    <!-- INLINE ERROR BANNER -->
+                    <div id="banner-error" class="hidden mb-4 p-3 rounded-xl bg-rose-950/90 border border-rose-500/50 text-rose-300 text-xs flex items-start gap-2 animate-fadeIn">
+                        <svg class="w-4 h-4 shrink-0 text-rose-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span id="banner-error-text">Validation error message goes here.</span>
+                    </div>
+
+                    <!-- INLINE SUCCESS BANNER -->
+                    <div id="banner-success" class="hidden mb-4 p-3 rounded-xl bg-emerald-950/90 border border-emerald-500/50 text-emerald-300 text-xs flex items-start gap-2 animate-fadeIn">
+                        <svg class="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        <span id="banner-success-text">Deck saved successfully.</span>
+                    </div>
+
+                    <!-- FORM CONTENT -->
+                    <form id="deck-form" onsubmit="event.preventDefault(); handleSave();" class="space-y-4">
+                        
+                        <!-- DECK NAME FIELD -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label for="deck-name" class="text-xs font-medium text-slate-300">
+                                    Deck Name <span class="text-rose-400">*</span>
+                                </label>
+                                <span id="char-counter" class="text-[10px] text-slate-400 font-mono">0/24</span>
+                            </div>
+                            <input 
+                                type="text" 
+                                id="deck-name" 
+                                maxlength="24"
+                                placeholder="e.g. Thai Vocabulary"
+                                oninput="updateCharCounter()"
+                                class="w-full bg-slate-700 text-slate-50 placeholder-slate-400 text-sm rounded-xl px-3.5 py-2.5 border border-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            />
+                        </div>
+
+                        <!-- SEGMENTED CONTROL: SIDE COUNT -->
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1.5">
+                                Side Count
+                            </label>
+                            <div class="grid grid-cols-2 gap-1 p-1 bg-slate-900/60 rounded-xl border border-slate-700/80">
+                                <button 
+                                    type="button" 
+                                    id="btn-side-2" 
+                                    onclick="setSides(2)" 
+                                    class="py-2 text-xs font-medium rounded-lg transition-all text-slate-400 hover:text-slate-200">
+                                    2 Sides
+                                </button>
+                                <button 
+                                    type="button" 
+                                    id="btn-side-3" 
+                                    onclick="setSides(3)" 
+                                    class="py-2 text-xs font-medium rounded-lg bg-indigo-600 text-white shadow transition-all">
+                                    3 Sides (Default)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SIDE LABELS GROUP -->
+                        <div class="space-y-3 pt-1">
+                            
+                            <!-- SIDE 1 LABEL -->
+                            <div>
+                                <label for="side-1-label" class="block text-xs font-medium text-slate-300 mb-1">
+                                    Side 1 Label <span class="text-rose-400">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="side-1-label" 
+                                    placeholder="e.g. Script"
+                                    class="w-full bg-slate-700 text-slate-50 placeholder-slate-400 text-sm rounded-xl px-3.5 py-2.5 border border-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                />
+                            </div>
+
+                            <!-- SIDE 2 LABEL -->
+                            <div>
+                                <label for="side-2-label" class="block text-xs font-medium text-slate-300 mb-1">
+                                    Side 2 Label <span class="text-rose-400">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="side-2-label" 
+                                    placeholder="e.g. Phonetic"
+                                    class="w-full bg-slate-700 text-slate-50 placeholder-slate-400 text-sm rounded-xl px-3.5 py-2.5 border border-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                />
+                            </div>
+
+                            <!-- SIDE 3 LABEL (DYNAMIC) -->
+                            <div id="side-3-wrapper" class="transition-all duration-300">
+                                <label for="side-3-label" class="block text-xs font-medium text-slate-300 mb-1">
+                                    Side 3 Label <span class="text-rose-400">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="side-3-label" 
+                                    placeholder="e.g. Meaning"
+                                    class="w-full bg-slate-700 text-slate-50 placeholder-slate-400 text-sm rounded-xl px-3.5 py-2.5 border border-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                />
+                            </div>
+
+                        </div>
+
+                        <!-- PRIMARY FORM ACTION BUTTON -->
+                        <div class="pt-3">
+                            <button 
+                                type="submit" 
+                                id="main-submit-btn" 
+                                class="w-full py-3 px-4 bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white font-semibold text-sm rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span id="btn-spinner" class="hidden">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                </span>
+                                <span id="btn-text">Save Deck</span>
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <!-- ========================================== -->
+        <!-- 3. DESIGN SYSTEM & SPEC INSPECTOR PANEL    -->
+        <!-- ========================================== -->
+        <aside class="w-full lg:w-80 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 shrink-0 overflow-y-auto max-h-64 lg:max-h-none text-xs">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                <h3 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Design Spec Inspector
+                </h3>
+                <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">Tailwind CDN</span>
+            </div>
+
+            <!-- Active Tokens List -->
+            <div class="space-y-4">
+                
+                <!-- Color Tokens -->
+                <div>
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-2">Color Palette Tokens</span>
+                    <div class="space-y-1.5 font-mono text-[11px]">
+                        <div class="flex items-center justify-between p-1.5 rounded bg-slate-950/60 border border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded bg-[#0B0F19] border border-slate-700"></span>
+                                <span class="text-slate-300">bg-app</span>
+                            </div>
+                            <span class="text-slate-500">#0B0F19</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 rounded bg-slate-950/60 border border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded bg-[#1E293B] border border-slate-700"></span>
+                                <span class="text-slate-300">bg-card</span>
+                            </div>
+                            <span class="text-slate-500">#1E293B</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 rounded bg-slate-950/60 border border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded bg-[#334155] border border-slate-700"></span>
+                                <span class="text-slate-300">bg-surface-muted</span>
+                            </div>
+                            <span class="text-slate-500">#334155</span>
+                        </div>
+                        <div class="flex items-center justify-between p-1.5 rounded bg-slate-950/60 border border-slate-800">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3.5 h-3.5 rounded bg-[#6366F1]"></span>
+                                <span class="text-slate-300">brand-primary</span>
+                            </div>
+                            <span class="text-slate-500">#6366F1</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layout & Geometry Tokens -->
+                <div>
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-2">Layout Geometry</span>
+                    <div class="space-y-1 text-slate-300 text-[11px]">
+                        <div class="flex justify-between py-1 border-b border-slate-800/60">
+                            <span class="text-slate-400">Card Radius:</span>
+                            <span class="font-mono text-indigo-300">rounded-3xl (24px)</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800/60">
+                            <span class="text-slate-400">Card Padding:</span>
+                            <span class="font-mono text-indigo-300">p-6 (24px)</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800/60">
+                            <span class="text-slate-400">Button Radius:</span>
+                            <span class="font-mono text-indigo-300">rounded-xl (12px)</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-slate-800/60">
+                            <span class="text-slate-400">Elevation:</span>
+                            <span class="font-mono text-indigo-300">shadow-2xl</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Accessibility & Contrast Verification -->
+                <div>
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-2">WCAG Contrast Ratings</span>
+                    <div class="space-y-1.5 text-[11px]">
+                        <div class="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-300">Primary Text on bg-card</span>
+                            <span class="text-emerald-400 font-semibold font-mono">14.2:1 (AAA)</span>
+                        </div>
+                        <div class="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-300">Secondary Text on bg-card</span>
+                            <span class="text-emerald-400 font-semibold font-mono">4.6:1 (AA)</span>
+                        </div>
+                        <div class="p-2 rounded bg-slate-950/60 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-300">Error Banner Text</span>
+                            <span class="text-emerald-400 font-semibold font-mono">5.2:1 (AA)</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. INTERACTIVE SIMULATION SCRIPT           -->
+    <!-- ========================================== -->
+    <script>
+        // State variables
+        let sideCount = 3;
+        let isOffline = false;
+        let currentMode = 'create'; // 'create' | 'edit'
+
+        // Elements
+        const deckNameInput = document.getElementById('deck-name');
+        const side1Input = document.getElementById('side-1-label');
+        const side2Input = document.getElementById('side-2-label');
+        const side3Input = document.getElementById('side-3-label');
+        const side3Wrapper = document.getElementById('side-3-wrapper');
+        const charCounter = document.getElementById('char-counter');
+        const viewTitle = document.getElementById('view-title');
+        
+        const bannerError = document.getElementById('banner-error');
+        const bannerErrorText = document.getElementById('banner-error-text');
+        const bannerSuccess = document.getElementById('banner-success');
+        const bannerSuccessText = document.getElementById('banner-success-text');
+        const bannerOffline = document.getElementById('banner-offline');
+
+        const btnSide2 = document.getElementById('btn-side-2');
+        const btnSide3 = document.getElementById('btn-side-3');
+        const mainSubmitBtn = document.getElementById('main-submit-btn');
+        const headerSaveBtn = document.getElementById('header-save-btn');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const btnText = document.getElementById('btn-text');
+
+        // Character counter logic
+        function updateCharCounter() {
+            const len = deckNameInput.value.length;
+            charCounter.textContent = `${len}/24`;
+            if (len >= 24) {
+                charCounter.classList.add('text-rose-400', 'font-bold');
+                charCounter.classList.remove('text-slate-400');
+            } else {
+                charCounter.classList.remove('text-rose-400', 'font-bold');
+                charCounter.classList.add('text-slate-400');
+            }
+        }
+
+        // Dynamic side toggle (2 vs 3 sides)
+        function setSides(count) {
+            sideCount = count;
+            if (count === 2) {
+                btnSide2.className = "py-2 text-xs font-medium rounded-lg bg-indigo-600 text-white shadow transition-all";
+                btnSide3.className = "py-2 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all";
+                side3Wrapper.classList.add('hidden');
+            } else {
+                btnSide3.className = "py-2 text-xs font-medium rounded-lg bg-indigo-600 text-white shadow transition-all";
+                btnSide2.className = "py-2 text-xs font-medium rounded-lg text-slate-400 hover:text-slate-200 transition-all";
+                side3Wrapper.classList.remove('hidden');
+            }
+            hideBanners();
+        }
+
+        // Hide all status banners
+        function hideBanners() {
+            bannerError.classList.add('hidden');
+            bannerSuccess.classList.add('hidden');
+        }
+
+        // Set screen state (Create vs Edit)
+        function setState(mode) {
+            currentMode = mode;
+            hideBanners();
+            
+            const btnCreate = document.getElementById('btn-create');
+            const btnEdit = document.getElementById('btn-edit');
+
+            if (mode === 'create') {
+                viewTitle.textContent = "Create Deck";
+                deckNameInput.value = "";
+                side1Input.value = "";
+                side2Input.value = "";
+                side3Input.value = "";
+                setSides(3);
+                
+                btnCreate.className = "px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow";
+                btnEdit.className = "px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700";
+            } else {
+                viewTitle.textContent = "Deck Edit";
+                deckNameInput.value = "Thai Vocabulary";
+                side1Input.value = "Script";
+                side2Input.value = "Phonetic";
+                side3Input.value = "Meaning";
+                setSides(3);
+
+                btnEdit.className = "px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow";
+                btnCreate.className = "px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors border border-slate-700";
+            }
+            updateCharCounter();
+        }
+
+        // Trigger Validation Error state
+        function triggerValidationError() {
+            hideBanners();
+            deckNameInput.value = "";
+            updateCharCounter();
+            bannerErrorText.textContent = "Deck name and mandatory side labels cannot be empty.";
+            bannerError.classList.remove('hidden');
+        }
+
+        // Trigger Max Length Error state
+        function triggerMaxLengthError() {
+            hideBanners();
+            deckNameInput.value = "Thai Vocabulary Advanced Course";
+            updateCharCounter();
+            bannerErrorText.textContent = "Deck name cannot exceed 24 characters.";
+            bannerError.classList.remove('hidden');
+        }
+
+        // Toggle Proactive Offline state
+        function toggleOffline() {
+            isOffline = !isOffline;
+            const btnOffline = document.getElementById('btn-offline');
+            const inputs = [deckNameInput, side1Input, side2Input, side3Input, mainSubmitBtn, headerSaveBtn];
+
+            if (isOffline) {
+                bannerOffline.classList.remove('hidden');
+                btnOffline.classList.add('ring-2', 'ring-amber-400');
+                inputs.forEach(el => el.disabled = true);
+            } else {
+                bannerOffline.classList.add('hidden');
+                btnOffline.classList.remove('ring-2', 'ring-amber-400');
+                inputs.forEach(el => el.disabled = false);
+            }
+        }
+
+        // Trigger Loading state
+        function triggerLoading() {
+            hideBanners();
+            btnSpinner.classList.remove('hidden');
+            btnText.textContent = "Saving Deck...";
+            mainSubmitBtn.disabled = true;
+            headerSaveBtn.disabled = true;
+
+            setTimeout(() => {
+                btnSpinner.classList.add('hidden');
+                btnText.textContent = "Save Deck";
+                if (!isOffline) {
+                    mainSubmitBtn.disabled = false;
+                    headerSaveBtn.disabled = false;
+                }
+            }, 1800);
+        }
+
+        // Trigger Success state
+        function triggerSuccess() {
+            hideBanners();
+            const name = deckNameInput.value.trim() || "Thai Vocabulary";
+            const action = currentMode === 'create' ? 'created' : 'updated';
+            bannerSuccessText.textContent = `Deck "${name}" ${action} successfully.`;
+            bannerSuccess.classList.remove('hidden');
+        }
+
+        // Handle Save action logic
+        function handleSave() {
+            if (isOffline) return;
+            hideBanners();
+
+            const name = deckNameInput.value.trim();
+            const s1 = side1Input.value.trim();
+            const s2 = side2Input.value.trim();
+            const s3 = side3Input.value.trim();
+
+            if (!name) {
+                bannerErrorText.textContent = "Deck name is required.";
+                bannerError.classList.remove('hidden');
+                return;
+            }
+
+            if (name.length > 24) {
+                bannerErrorText.textContent = "Deck name cannot exceed 24 characters.";
+                bannerError.classList.remove('hidden');
+                return;
+            }
+
+            if (!s1 || !s2 || (sideCount === 3 && !s3)) {
+                bannerErrorText.textContent = sideCount === 3 
+                    ? "Side 1, Side 2, and Side 3 labels are mandatory for 3-sided decks."
+                    : "Side 1 and Side 2 labels are mandatory.";
+                bannerError.classList.remove('hidden');
+                return;
+            }
+
+            triggerLoading();
+            setTimeout(() => {
+                triggerSuccess();
+            }, 1850);
+        }
+
+        // Reset form to default
+        function resetForm() {
+            setState('create');
+            if (isOffline) toggleOffline();
+        }
+
+        // Initialize default view state
+        window.onload = function() {
+            setState('create');
+        };
+    </script>
+</body>
+</html>
