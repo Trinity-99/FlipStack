@@ -59,6 +59,13 @@ All primary cards, modals, and container elements must adhere to these standardi
 ### Mobile Viewport Frame Rule
 - **Standard Frame Target:** iPhone 12 Mini baseline (`375px × 812px`).
 - **Card Bounds:** Primary floating cards maintain a maximum height constraint (e.g. `h-80` / `20rem` on mobile study viewports) to ensure touch targets for upper/lower swipe gestures remain effortlessly reachable single-handed.
+
+### Compact Forms on Narrow Viewports
+- Dense forms may use `p-4` card padding and tighter field spacing below the `sm` breakpoint to reduce unnecessary scrolling on the standard mobile frame. Restore the standard `p-6` padding and roomier spacing at `sm` and above.
+- Multi-line textareas may use a shorter default height on narrow screens and increase their minimum height at wider breakpoints. Keep textareas vertically resizable so users can expand fields when needed.
+- Preserve accessible touch targets for buttons and selectable controls when compacting forms; reduce surrounding whitespace and text-entry area before reducing action-control height.
+- Task-focused editing forms may hide the bottom navigation when it does not help complete the current task. Keep this route-scoped so core navigation remains available on the main study and card-list screens.
+- Form success and error feedback must remain visible while the user scrolls without moving the form. Show the message in a fixed, high-opacity banner directly below the sticky app header; keep it accessible with a polite status role for success and an assertive alert role for errors.
 ---
 
 # 2. Main Navigation & App Architecture

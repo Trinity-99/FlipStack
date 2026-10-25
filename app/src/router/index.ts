@@ -37,11 +37,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/cards/new',
         name: 'CardCreate',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
-        meta: {
-          placeholderTitle: 'Create a Card',
-          placeholderDescription: 'Add a new study card to your active deck.',
-        },
+        component: () => import('@/views/CardEditView.vue'),
+        meta: { deckSwitcherDisabled: true, hideBottomNavigation: true },
+      },
+      {
+        path: '/cards/edit/:id',
+        name: 'CardEdit',
+        component: () => import('@/views/CardEditView.vue'),
+        meta: { deckSwitcherDisabled: true, hideBottomNavigation: true },
       },
       {
         path: '/study/init',

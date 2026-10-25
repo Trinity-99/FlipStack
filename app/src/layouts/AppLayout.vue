@@ -10,6 +10,8 @@ const route = useRoute()
 const authStore = useAuthStore()
 const deckStore = useDeckStore()
 const isImmersive = computed(() => route.meta.immersive === true)
+const isDeckSwitcherDisabled = computed(() => route.meta.deckSwitcherDisabled === true)
+const isBottomNavigationHidden = computed(() => route.meta.hideBottomNavigation === true)
 
 async function initializeDecks(): Promise<void> {
   const profile = authStore.profile
@@ -43,7 +45,7 @@ watch(() => authStore.profile, initializeDecks, { immediate: true })
         class="sticky top-0 z-20 border-b border-border-subtle bg-app/95 px-4 py-3 backdrop-blur"
       >
         <div class="flex items-center gap-2">
-          <DeckSwitcher />
+          <DeckSwitcher :disabled="isDeckSwitcherDisabled" />
 
           <RouterLink
             :to="{ name: 'CardList' }"
@@ -101,7 +103,7 @@ watch(() => authStore.profile, initializeDecks, { immediate: true })
         <RouterView />
       </main>
 
-      <BottomNavigation v-if="!isImmersive" />
+      <BottomNavigation v-if="!isImmersive && !isBottomNavigationHidden" />
     </div>
   </div>
 </template>

@@ -25,8 +25,9 @@ describe('DeckSwitcher', () => {
     vi.restoreAllMocks()
   })
 
-  function mountSwitcher() {
+  function mountSwitcher(disabled = false) {
     return mount(DeckSwitcher, {
+      props: { disabled },
       global: {
         plugins: [router],
       },
@@ -77,5 +78,15 @@ describe('DeckSwitcher', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('DeckCreate')
+  })
+
+  it('prevents deck switching when the editor locks the active deck', async () => {
+    const wrapper = mountSwitcher(true)
+
+    expect(wrapper.get('[aria-label="Select active deck"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[aria-label="Select active deck"]').find('svg').exists()).toBe(false)
+    await wrapper.get('[aria-label="Select active deck"]').trigger('click')
+
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false)
   })
 })

@@ -38,6 +38,29 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   /**
+   * @summary Adds a saved card to the active deck cache or replaces its cached version.
+   * @param {Card} card - The persisted card to synchronize with the cache.
+   * @returns {void}
+   * @throws {Error} If the card has not been persisted.
+   */
+  function upsertCard(card: Card): void {
+    if (!card.id) {
+      throw new Error('Cannot add a card to the cache before it has been saved.')
+    }
+    if (loadedDeckId.value !== card.deckId) return
+
+    const existingIndex = cards.value.findIndex((cachedCard) => cachedCard.id === card.id)
+    if (existingIndex === -1) {
+      cards.value = [card, ...cards.value]
+      return
+    }
+
+    cards.value = cards.value.map((cachedCard, index) =>
+      index === existingIndex ? card : cachedCard,
+    )
+  }
+
+  /**
    * @summary Clears cards when the active user or deck context is reset.
    * @returns {void}
    */
@@ -46,5 +69,5 @@ export const useCardStore = defineStore('cards', () => {
     loadedDeckId.value = null
   }
 
-  return { cards, loadedDeckId, fetchCardsForDeck, setCardsForDeck, clear }
+  return { cards, loadedDeckId, fetchCardsForDeck, setCardsForDeck, upsertCard, clear }
 })

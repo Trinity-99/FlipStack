@@ -5,15 +5,17 @@ import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/
  * @summary Represents the content structure of a 3-sided study card.
  */
 export interface CardContent {
-  s1?: string;
-  s2?: string;
-  s3?: string;
+  s1?: string
+  s2?: string
+  s3?: string
 }
 
 /**
  * @summary Represents a 3-sided study card with active record persistence and tag management.
  */
 export class Card {
+  public static readonly MAX_SIDE_LENGTH = 256
+
   constructor(
     public readonly id: string | null,
     public readonly deckId: string,
@@ -21,7 +23,7 @@ export class Card {
     public content: CardContent,
     public tagIds: string[],
     public readonly createdAt: Date | null,
-    public readonly updatedAt: Date | null
+    public readonly updatedAt: Date | null,
   ) {}
 
   /**
@@ -31,12 +33,12 @@ export class Card {
   public isStudyReady(): boolean {
     try {
       const filledSides = Object.values(this.content).filter(
-        val => val !== undefined && typeof val === 'string' && val.trim().length > 0
-      );
-      return filledSides.length >= 2;
+        (val) => val !== undefined && typeof val === 'string' && val.trim().length > 0,
+      )
+      return filledSides.length >= 2
     } catch (error) {
-      console.error('Error checking if card is study-ready:', error);
-      return false;
+      console.error('Error checking if card is study-ready:', error)
+      return false
     }
   }
 
@@ -46,12 +48,11 @@ export class Card {
    * @throws {Error} If required fields are missing or the database operation fails.
    */
   public async save(): Promise<void> {
-    if (!this.deckId || !this.userId) {
-      throw new Error('Cannot save Card: Missing required fields (deckId or userId).');
-    }
+    this.validate()
+    this.content = this.normalizeContent()
 
     try {
-      let cardId = this.id;
+      let cardId = this.id
 
       if (!cardId) {
         // INSERT new card
@@ -63,18 +64,20 @@ export class Card {
             content: this.content,
           })
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while inserting card: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while inserting card: ${error?.message || 'No data returned'}`,
+          )
         }
 
-        cardId = data.id;
+        cardId = data.id
         Object.assign(this, {
           id: cardId,
           createdAt: new Date(data.created_at),
           updatedAt: new Date(data.updated_at),
-        });
+        })
       } else {
         // UPDATE existing card
         const { data, error } = await supabase
@@ -84,23 +87,60 @@ export class Card {
           })
           .eq('id', cardId)
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while updating card: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while updating card: ${error?.message || 'No data returned'}`,
+          )
         }
 
         Object.assign(this, {
           updatedAt: new Date(data.updated_at),
-        });
+        })
       }
 
       // Sync tags in the card_tag junction table
-      await this.syncTags(cardId!);
+      await this.syncTags(cardId!)
     } catch (error: unknown) {
-      console.error('Card.save failed:', error);
-      throw error;
+      console.error('Card.save failed:', error)
+      throw error
     }
+  }
+
+  /**
+   * @summary Validates and normalizes the card before persistence.
+   * @returns {void}
+   * @throws {Error} If identifiers or side content violate card requirements.
+   */
+  private validate(): void {
+    if (!this.deckId || !this.deckId.trim() || !this.userId || !this.userId.trim()) {
+      throw new Error('Cannot save Card: Missing required fields (deckId or userId).')
+    }
+
+    const normalizedContent = this.normalizeContent()
+    const sides = Object.entries(normalizedContent)
+    if (sides.length === 0) {
+      throw new Error('At least one side must contain text.')
+    }
+
+    const overlongSide = sides.find(([, value]) => value.length > Card.MAX_SIDE_LENGTH)
+    if (overlongSide) {
+      throw new Error(`Card sides cannot exceed ${Card.MAX_SIDE_LENGTH} characters.`)
+    }
+  }
+
+  /**
+   * @summary Trims side content and omits sides that are blank after trimming.
+   * @returns {CardContent} Normalized card content.
+   */
+  private normalizeContent(): CardContent {
+    const content: CardContent = {}
+    for (const side of ['s1', 's2', 's3'] as const) {
+      const value = this.content[side]?.trim()
+      if (value) content[side] = value
+    }
+    return content
   }
 
   /**
@@ -110,28 +150,23 @@ export class Card {
    */
   private async syncTags(cardId: string): Promise<void> {
     // 1. Remove existing tag links for this card
-    const { error: deleteError } = await supabase
-      .from('card_tag')
-      .delete()
-      .eq('card_id', cardId);
+    const { error: deleteError } = await supabase.from('card_tag').delete().eq('card_id', cardId)
 
     if (deleteError) {
-      throw new Error(`Failed to clear old card tags: ${deleteError.message}`);
+      throw new Error(`Failed to clear old card tags: ${deleteError.message}`)
     }
 
     // 2. Insert new tag links if any are provided
     if (this.tagIds && this.tagIds.length > 0) {
-      const tagInserts = this.tagIds.map(tagId => ({
+      const tagInserts = this.tagIds.map((tagId) => ({
         card_id: cardId,
         tag_id: tagId,
-      }));
+      }))
 
-      const { error: insertError } = await supabase
-        .from('card_tag')
-        .insert(tagInserts);
+      const { error: insertError } = await supabase.from('card_tag').insert(tagInserts)
 
       if (insertError) {
-        throw new Error(`Failed to save card tags: ${insertError.message}`);
+        throw new Error(`Failed to save card tags: ${insertError.message}`)
       }
     }
   }
@@ -143,21 +178,18 @@ export class Card {
    */
   public async delete(): Promise<void> {
     if (!this.id) {
-      throw new Error('Cannot delete a card that has not been saved to the database.');
+      throw new Error('Cannot delete a card that has not been saved to the database.')
     }
 
     try {
-      const { error } = await supabase
-        .from('card')
-        .delete()
-        .eq('id', this.id);
+      const { error } = await supabase.from('card').delete().eq('id', this.id)
 
       if (error) {
-        throw new Error(`Database error while deleting card: ${error.message}`);
+        throw new Error(`Database error while deleting card: ${error.message}`)
       }
     } catch (error: unknown) {
-      console.error(`Card.delete failed for ID ${this.id}:`, error);
-      throw error;
+      console.error(`Card.delete failed for ID ${this.id}:`, error)
+      throw error
     }
   }
 
@@ -169,30 +201,26 @@ export class Card {
    */
   public static async findById(cardId: string): Promise<Card | null> {
     if (!cardId || cardId.trim() === '') {
-      throw new Error('Invalid cardId provided to Card.findById.');
+      throw new Error('Invalid cardId provided to Card.findById.')
     }
 
     try {
-      const { data, error } = await supabase
-        .from('card')
-        .select('*')
-        .eq('id', cardId)
-        .single();
+      const { data, error } = await supabase.from('card').select('*').eq('id', cardId).single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw new Error(`Database error while finding card by ID: ${error.message}`);
+        if (error.code === 'PGRST116') return null
+        throw new Error(`Database error while finding card by ID: ${error.message}`)
       }
 
-      if (!data) return null;
+      if (!data) return null
 
       // Fetch associated tag IDs from card_tag junction table
-      const tagIds = await Card.fetchTagIdsForCard(cardId);
+      const tagIds = await Card.fetchTagIdsForCard(cardId)
 
-      return Card.fromJSON(data, tagIds);
+      return Card.fromJSON(data, tagIds)
     } catch (error: unknown) {
-      console.error(`Card.findById failed for ID ${cardId}:`, error);
-      throw error;
+      console.error(`Card.findById failed for ID ${cardId}:`, error)
+      throw error
     }
   }
 
@@ -204,7 +232,7 @@ export class Card {
    */
   public static async findAllForDeck(deckId: string): Promise<Card[]> {
     if (!deckId || deckId.trim() === '') {
-      throw new Error('Invalid deckId provided to Card.findAllForDeck.');
+      throw new Error('Invalid deckId provided to Card.findAllForDeck.')
     }
 
     try {
@@ -212,37 +240,37 @@ export class Card {
         .from('card')
         .select('*')
         .eq('deck_id', deckId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (error) {
-        throw new Error(`Database error while fetching deck cards: ${error.message}`);
+        throw new Error(`Database error while fetching deck cards: ${error.message}`)
       }
 
-      if (!data || data.length === 0) return [];
+      if (!data || data.length === 0) return []
 
       // Fetch all card-tag relations for these cards in one batch query for efficiency
-      const cardIds = data.map(c => c.id);
+      const cardIds = data.map((c) => c.id)
       const { data: tagRelations, error: tagError } = await supabase
         .from('card_tag')
         .select('card_id, tag_id')
-        .in('card_id', cardIds);
+        .in('card_id', cardIds)
 
       if (tagError) {
-        throw new Error(`Database error while fetching card tags: ${tagError.message}`);
+        throw new Error(`Database error while fetching card tags: ${tagError.message}`)
       }
 
       // Map tag IDs by card ID for quick lookup
-      const tagMap = new Map<string, string[]>();
+      const tagMap = new Map<string, string[]>()
       for (const rel of tagRelations || []) {
-        const existing = tagMap.get(rel.card_id) || [];
-        existing.push(rel.tag_id);
-        tagMap.set(rel.card_id, existing);
+        const existing = tagMap.get(rel.card_id) || []
+        existing.push(rel.tag_id)
+        tagMap.set(rel.card_id, existing)
       }
 
-      return data.map(row => Card.fromJSON(row, tagMap.get(row.id) || []));
+      return data.map((row) => Card.fromJSON(row, tagMap.get(row.id) || []))
     } catch (error: unknown) {
-      console.error('Card.findAllForDeck failed:', error);
-      throw error;
+      console.error('Card.findAllForDeck failed:', error)
+      throw error
     }
   }
 
@@ -253,13 +281,10 @@ export class Card {
    * @returns {Promise<string[]>} Array of associated tag UUIDs.
    */
   private static async fetchTagIdsForCard(cardId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from('card_tag')
-      .select('tag_id')
-      .eq('card_id', cardId);
+    const { data, error } = await supabase.from('card_tag').select('tag_id').eq('card_id', cardId)
 
-    if (error || !data) return [];
-    return data.map(row => row.tag_id);
+    if (error || !data) return []
+    return data.map((row) => row.tag_id)
   }
 
   /**
@@ -279,17 +304,19 @@ export class Card {
         throw new Error('Invalid raw data: Invalid content to parse Card.')
       }
 
-      const cardContent = content ? Object.fromEntries(
-        Object.entries(content).map(([key, value]) => {
-          if (key !== 's1' && key !== 's2' && key !== 's3') {
-            throw new Error(`Invalid raw data: Invalid card side ${key}.`)
-          }
-          if (typeof value !== 'string') {
-            throw new Error(`Invalid raw data: Invalid card content for ${key}.`)
-          }
-          return [key, value]
-        })
-      ) as CardContent : {}
+      const cardContent = content
+        ? (Object.fromEntries(
+            Object.entries(content).map(([key, value]) => {
+              if (key !== 's1' && key !== 's2' && key !== 's3') {
+                throw new Error(`Invalid raw data: Invalid card side ${key}.`)
+              }
+              if (typeof value !== 'string') {
+                throw new Error(`Invalid raw data: Invalid card content for ${key}.`)
+              }
+              return [key, value]
+            }),
+          ) as CardContent)
+        : {}
 
       return new Card(
         requiredString(json, 'id', 'Card'),
@@ -298,7 +325,7 @@ export class Card {
         cardContent,
         tagIds,
         optionalDate(json, 'created_at', 'Card'),
-        optionalDate(json, 'updated_at', 'Card')
+        optionalDate(json, 'updated_at', 'Card'),
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Card from JSON: ${errorMessage(error)}`)

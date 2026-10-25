@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useDeckStore } from '@/stores/deckStore'
+
+const props = defineProps<{
+  disabled?: boolean
+}>()
 
 const deckStore = useDeckStore()
 const rootElement = ref<HTMLElement | null>(null)
@@ -20,6 +24,13 @@ function closeOnOutsideClick(event: MouseEvent): void {
 function closeOnEscape(): void {
   closeMenu()
 }
+
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) closeMenu()
+  },
+)
 
 async function selectDeck(deckId: string): Promise<void> {
   if (deckId === deckStore.activeDeckId) {
@@ -48,10 +59,11 @@ onBeforeUnmount(() => {
   <div ref="rootElement" class="relative min-w-0 flex-1" @keydown.esc="closeOnEscape">
     <button
       type="button"
-      class="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-border-subtle bg-surface-muted px-3 py-2 text-left text-primary transition-colors hover:border-brand-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+      class="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-border-subtle bg-surface-muted px-3 py-2 text-left text-primary transition-colors hover:border-brand-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-60"
       aria-label="Select active deck"
       aria-controls="deck-switcher-menu"
       :aria-expanded="isOpen"
+      :disabled="disabled"
       @click="isOpen = !isOpen"
     >
       <span class="truncate font-semibold">
@@ -60,6 +72,7 @@ onBeforeUnmount(() => {
         }}
       </span>
       <svg
+        v-if="!disabled"
         aria-hidden="true"
         class="h-4 w-4 shrink-0 transition-transform"
         :class="{ 'rotate-180': isOpen }"
@@ -75,7 +88,7 @@ onBeforeUnmount(() => {
     </button>
 
     <div
-      v-if="isOpen"
+      v-if="isOpen && !disabled"
       id="deck-switcher-menu"
       class="absolute left-0 right-0 top-full z-30 mt-2 max-h-[min(70vh,24rem)] overflow-y-auto rounded-2xl border-2 border-slate-600 bg-card p-2 shadow-2xl"
       role="menu"

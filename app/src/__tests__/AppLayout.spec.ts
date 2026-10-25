@@ -29,6 +29,12 @@ const layoutRouter = createRouter({
           meta: { immersive: true },
         },
         {
+          path: 'card-editor',
+          name: 'LayoutCardEditor',
+          component: { template: '<p>Card editor content</p>' },
+          meta: { deckSwitcherDisabled: true, hideBottomNavigation: true },
+        },
+        {
           path: '/cards',
           name: 'CardList',
           component: { template: '<div />' },
@@ -78,6 +84,16 @@ describe('AppLayout', () => {
     expect(wrapper.find('header').exists()).toBe(false)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Study content')
+  })
+
+  it('disables the shared deck switcher while the card editor is open', async () => {
+    await layoutRouter.push('/layout/card-editor')
+    const wrapper = mount(AppLayout, { global: { plugins: [layoutRouter] } })
+
+    expect(wrapper.get('[aria-label="Select active deck"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[aria-label="Select active deck"]').find('svg').exists()).toBe(false)
+    expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Card editor content')
   })
 
   it('initializes deck data when an authenticated profile exists', async () => {
