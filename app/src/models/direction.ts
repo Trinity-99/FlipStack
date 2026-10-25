@@ -1,24 +1,26 @@
 import { supabase } from '@/db/supabase'
 import { Card } from '@/models/card'
 import { Deck } from '@/models/deck'
-import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
+import { errorMessage, isDatabaseRecord, requiredDate, requiredString } from '@/models/modelUtils'
 
-export type SideRole = 'question' | 'answer' | 'extra';
+export type SideRole = 'question' | 'answer' | 'extra'
 
 export interface DirectionStep {
-  side: number; // 1, 2, or 3
-  role: SideRole;
+  side: number // 1, 2, or 3
+  role: SideRole
 }
 
 /**
  * @summary Represents a saved study direction configuration for a deck with active record persistence.
  */
 export class Direction {
+  private static readonly MAX_CONFIGURATION_BYTES = 200
+
   constructor(
     public readonly id: string | null,
     public readonly deckId: string,
     public configuration: DirectionStep[],
-    public readonly createdAt: Date | null
+    public readonly createdAt: Date | null,
   ) {}
 
   /**
@@ -32,18 +34,15 @@ export class Direction {
       throw new Error(`Deck with ID ${this.deckId} not found for direction ${this.id}.`)
     }
 
-    return this.configuration
-      .map(step => deck.getSideLabel(step.side))
-      .join(' - ')
+    return this.configuration.map((step) => deck.getSideLabel(step.side)).join(' - ')
   }
-
 
   /**
    * @summary Finds the designated Question step for this direction.
    * @returns {DirectionStep | undefined} The direction step configured as the question, or undefined.
    */
   public getQuestionStep(): DirectionStep | undefined {
-    return this.configuration.find(step => step.role === 'question');
+    return this.configuration.find((step) => step.role === 'question')
   }
 
   /**
@@ -51,7 +50,7 @@ export class Direction {
    * @returns {DirectionStep[]} Array of answer steps.
    */
   public getAnswerSteps(): DirectionStep[] {
-    return this.configuration.filter(step => step.role === 'answer');
+    return this.configuration.filter((step) => step.role === 'answer')
   }
 
   /**
@@ -60,32 +59,32 @@ export class Direction {
    * @returns {boolean} True if the card satisfies the question and all required answer slots.
    */
   public isCardEligible(card: Card): boolean {
-    if (!card || !card.content) return false;
+    if (!card || !card.content) return false
 
     try {
-      const questionStep = this.getQuestionStep();
-      const answerSteps = this.getAnswerSteps();
+      const questionStep = this.getQuestionStep()
+      const answerSteps = this.getAnswerSteps()
 
-      if (!questionStep) return false;
+      if (!questionStep) return false
 
       // Question side must have content
-      const questionVal = card.content[`s${questionStep.side}` as keyof typeof card.content];
+      const questionVal = card.content[`s${questionStep.side}` as keyof typeof card.content]
       if (!questionVal || questionVal.trim().length === 0) {
-        return false;
+        return false
       }
 
       // All answer sides must have content
       for (const ansStep of answerSteps) {
-        const ansVal = card.content[`s${ansStep.side}` as keyof typeof card.content];
+        const ansVal = card.content[`s${ansStep.side}` as keyof typeof card.content]
         if (!ansVal || ansVal.trim().length === 0) {
-          return false;
+          return false
         }
       }
 
-      return true;
+      return true
     } catch (error: unknown) {
-      console.error('Error evaluating card eligibility:', error);
-      return false;
+      console.error('Error evaluating card eligibility:', error)
+      return false
     }
   }
 
@@ -95,9 +94,10 @@ export class Direction {
    * @throws {Error} If required fields are missing or the database operation fails.
    */
   public async save(): Promise<void> {
-    if (!this.deckId || !this.configuration || this.configuration.length === 0) {
-      throw new Error('Cannot save Direction: Missing required fields (deckId or configuration).');
+    if (typeof this.deckId !== 'string' || !this.deckId.trim()) {
+      throw new Error('Cannot save Direction: Missing required deckId.')
     }
+    Direction.validateConfiguration(this.configuration)
 
     try {
       if (!this.id) {
@@ -109,16 +109,18 @@ export class Direction {
             configuration: this.configuration,
           })
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while inserting direction: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while inserting direction: ${error?.message || 'No data returned'}`,
+          )
         }
 
         Object.assign(this, {
           id: data.id,
           createdAt: new Date(data.created_at),
-        });
+        })
       } else {
         // UPDATE existing direction
         const { data, error } = await supabase
@@ -128,15 +130,17 @@ export class Direction {
           })
           .eq('id', this.id)
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while updating direction: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while updating direction: ${error?.message || 'No data returned'}`,
+          )
         }
       }
     } catch (error: unknown) {
-      console.error('Direction.save failed:', error);
-      throw error;
+      console.error('Direction.save failed:', error)
+      throw error
     }
   }
 
@@ -147,21 +151,18 @@ export class Direction {
    */
   public async delete(): Promise<void> {
     if (!this.id) {
-      throw new Error('Cannot delete a direction that has not been saved to the database.');
+      throw new Error('Cannot delete a direction that has not been saved to the database.')
     }
 
     try {
-      const { error } = await supabase
-        .from('direction')
-        .delete()
-        .eq('id', this.id);
+      const { error } = await supabase.from('direction').delete().eq('id', this.id)
 
       if (error) {
-        throw new Error(`Database error while deleting direction: ${error.message}`);
+        throw new Error(`Database error while deleting direction: ${error.message}`)
       }
     } catch (error: unknown) {
-      console.error(`Direction.delete failed for ID ${this.id}:`, error);
-      throw error;
+      console.error(`Direction.delete failed for ID ${this.id}:`, error)
+      throw error
     }
   }
 
@@ -173,7 +174,7 @@ export class Direction {
    */
   public static async findById(directionId: string): Promise<Direction | null> {
     if (!directionId || directionId.trim() === '') {
-      throw new Error('Invalid directionId provided to Direction.findById.');
+      throw new Error('Invalid directionId provided to Direction.findById.')
     }
 
     try {
@@ -181,17 +182,17 @@ export class Direction {
         .from('direction')
         .select('*')
         .eq('id', directionId)
-        .single();
+        .single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw new Error(`Database error while finding direction by ID: ${error.message}`);
+        if (error.code === 'PGRST116') return null
+        throw new Error(`Database error while finding direction by ID: ${error.message}`)
       }
 
-      return data ? Direction.fromJSON(data) : null;
+      return data ? Direction.fromJSON(data) : null
     } catch (error: unknown) {
-      console.error(`Direction.findById failed for ID ${directionId}:`, error);
-      throw error;
+      console.error(`Direction.findById failed for ID ${directionId}:`, error)
+      throw error
     }
   }
 
@@ -203,7 +204,7 @@ export class Direction {
    */
   public static async findAllForDeck(deckId: string): Promise<Direction[]> {
     if (!deckId || deckId.trim() === '') {
-      throw new Error('Invalid deckId provided to Direction.findAllForDeck.');
+      throw new Error('Invalid deckId provided to Direction.findAllForDeck.')
     }
 
     try {
@@ -211,16 +212,16 @@ export class Direction {
         .from('direction')
         .select('*')
         .eq('deck_id', deckId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
 
       if (error) {
-        throw new Error(`Database error while fetching deck directions: ${error.message}`);
+        throw new Error(`Database error while fetching deck directions: ${error.message}`)
       }
 
-      return (data || []).map(row => Direction.fromJSON(row));
+      return (data || []).map((row) => Direction.fromJSON(row))
     } catch (error: unknown) {
-      console.error('Direction.findAllForDeck failed:', error);
-      throw error;
+      console.error('Direction.findAllForDeck failed:', error)
+      throw error
     }
   }
 
@@ -240,22 +241,74 @@ export class Direction {
         throw new Error('Invalid raw data: Invalid configuration to parse Direction.')
       }
       const configuration = rawConfiguration.map((step): DirectionStep => {
-        if (!isDatabaseRecord(step) ||
+        if (
+          !isDatabaseRecord(step) ||
+          typeof step.side !== 'number' ||
+          !Number.isInteger(step.side) ||
           (step.side !== 1 && step.side !== 2 && step.side !== 3) ||
-          (step.role !== 'question' && step.role !== 'answer' && step.role !== 'extra')) {
+          (step.role !== 'question' && step.role !== 'answer' && step.role !== 'extra')
+        ) {
           throw new Error('Invalid raw data: Invalid direction step to parse Direction.')
         }
         return { side: step.side, role: step.role }
       })
+      Direction.validateConfiguration(configuration)
 
       return new Direction(
         requiredString(json, 'id', 'Direction'),
         requiredString(json, 'deck_id', 'Direction'),
         configuration,
-        optionalDate(json, 'created_at', 'Direction')
+        requiredDate(json, 'created_at', 'Direction'),
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Direction from JSON: ${errorMessage(error)}`)
+    }
+  }
+
+  private static validateConfiguration(configuration: DirectionStep[]): void {
+    if (!Array.isArray(configuration) || configuration.length < 2 || configuration.length > 3) {
+      throw new Error('A direction must contain two or three steps.')
+    }
+
+    const sides = new Set<number>()
+    let questionCount = 0
+    let answerCount = 0
+    for (const [index, step] of configuration.entries()) {
+      if (
+        !step ||
+        !Number.isInteger(step.side) ||
+        step.side < 1 ||
+        step.side > 3 ||
+        (step.role !== 'question' && step.role !== 'answer' && step.role !== 'extra')
+      ) {
+        throw new Error('Direction steps must contain a valid side and role.')
+      }
+      if (sides.has(step.side)) {
+        throw new Error('A direction cannot use the same side more than once.')
+      }
+      sides.add(step.side)
+
+      if (step.role === 'question') {
+        questionCount += 1
+        if (index !== 0) {
+          throw new Error('The question side must be the first direction step.')
+        }
+      } else if (step.role === 'answer') {
+        answerCount += 1
+      }
+    }
+
+    if (questionCount !== 1 || answerCount < 1) {
+      throw new Error('A direction must have exactly one question and at least one answer.')
+    }
+
+    // PostgreSQL jsonb::text adds one space after each colon and member comma.
+    const serializedByteLength =
+      new TextEncoder().encode(JSON.stringify(configuration)).length + configuration.length * 3
+    if (serializedByteLength > Direction.MAX_CONFIGURATION_BYTES) {
+      throw new Error(
+        `Direction configuration cannot exceed ${Direction.MAX_CONFIGURATION_BYTES} bytes.`,
+      )
     }
   }
 }

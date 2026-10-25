@@ -91,3 +91,77 @@ app/src/
 ├── App.vue
 └── main.ts
 ```
+## 8 Security Controls
+
+Chapter 6 defines authorization and the client key. This chapter defines the controls that follow from it. The client is untrusted: the database enforces every rule that protects data, and the app adds a second line of defense.
+
+### 8.1 Database
+
+All controls below are defined in `createDatabase.sql`.
+
+**Row-Level Security**
+
+- Every table has policies for select, insert, update and delete.
+- Every policy binds rows to `auth.uid()`, using `USING` for reads and `WITH CHECK` for writes.
+- Tables that reference other tables (`card`, `card_tag`, `direction`, `card_progress`) check that the referenced row belongs to the same user. A user cannot attach data to another user's deck or card.
+
+**Constraints**
+
+- `card_progress.counter` is between 0 and 10.
+- `direction` holds a valid ordered list: sides 1 to 3 without duplicates, exactly one question first, at least one answer.
+- `card` sides are a jsonb object with only the keys `s1`, `s2`, `s3`, each a string.
+- `deck` has 2 or 3 side labels.
+- Text fields have maximum lengths.
+
+**Limits**
+
+- A maximum size per card.
+- A maximum number of rows per user and table, enforced by trigger.
+
+**Data lifecycle**
+
+- Every user-owned table references the user with `ON DELETE CASCADE`. Deleting a user removes all of their data.
+
+### 8.2 App Code
+
+**Rendering**
+
+- Card, deck and tag content is rendered as plain text only.
+- `v-html` and `innerHTML` are not used for user content.
+
+**Offline data**
+
+- The local database (IndexedDB) is cleared on logout.
+- Local data is synced only through the models and the authenticated Supabase client, so Row-Level Security always applies.
+
+**Service worker**
+
+- The service worker caches static app assets only.
+- It never caches API responses or authentication tokens.
+
+**External data**
+
+- Any externally supplied data (imported files, for example) is untrusted. The models validate its structure and size before saving.
+- Values written to CSV are neutralized against formula injection.
+
+## 9 Query Safety
+
+The app never sends SQL. All data access goes through `supabase-js`, which sends parameterized requests. This protection holds only as long as user input is passed as a value and never becomes part of a query string.
+
+### 9.1 App Code
+
+- User input reaches the database only as a parameter of a builder method (`.eq()`, `.in()`, `.insert()`, `.update()` and similar).
+- User input is never concatenated into a string that the client library interprets, such as the arguments of `.or()`, `.filter()` or `.not()`. Where a dynamic filter is unavoidable, the model builds it from validated values only.
+- Column names for sorting and filtering come from a fixed list in the model, never from user input.
+- Only the models build queries (see chapter 4), so these rules apply in one place.
+
+### 9.2 Database
+
+- Database functions and triggers do not build SQL by string concatenation. Dynamic SQL uses `format()` with `%I` for identifiers and `%L` for literals, or `USING` for values.
+- `SECURITY DEFINER` functions are avoided because they bypass Row-Level Security. If one is required, it sets a fixed `search_path`.
+- A `SECURITY DEFINER` function that clients can call (RPC) also checks `auth.uid()` itself.
+- A trigger function works only on the row that fired it (`NEW`) and does not use `auth.uid()`, because triggers such as the sign-up trigger run outside a user request.
+
+### 9.3 Scripts Outside the App
+
+- Scripts that write to the database (such as the one-time import) use parameterized statements. SQL is never assembled from input lines.

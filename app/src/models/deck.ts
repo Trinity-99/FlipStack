@@ -1,11 +1,19 @@
 import { supabase } from '@/db/supabase'
-import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
+import {
+  databaseCharacterLength,
+  errorMessage,
+  isDatabaseRecord,
+  requiredDate,
+  requiredString,
+} from '@/models/modelUtils'
 
 /**
  * @summary Represents a study deck containing user-defined side labels and active record persistence.
  */
 export class Deck {
   private static readonly MAX_TITLE_LENGTH = 24
+  private static readonly MAX_DATABASE_TITLE_LENGTH = 32
+  private static readonly MAX_SIDE_LABEL_LENGTH = 32
 
   constructor(
     public readonly id: string | null,
@@ -23,7 +31,7 @@ export class Deck {
    * @throws {Error} If the side number is out of bounds.
    */
   public getSideLabel(sideNum: number): string {
-    if (sideNum < 1 || sideNum > 3) {
+    if (!Number.isInteger(sideNum) || sideNum < 1 || sideNum > 3) {
       throw new Error(`Invalid side number: ${sideNum}. Side numbers must be between 1 and 3.`)
     }
     return this.sideLabels[sideNum - 1] || `Side ${sideNum}`
@@ -98,20 +106,30 @@ export class Deck {
    * @throws {Error} If the user, title, or side labels violate deck requirements.
    */
   private validate(): void {
-    if (!this.userId || !this.userId.trim()) {
+    if (typeof this.userId !== 'string' || !this.userId.trim()) {
       throw new Error('Cannot save Deck: Missing required userId.')
     }
-    if (!this.title || !this.title.trim()) {
+    if (typeof this.title !== 'string' || !this.title.trim()) {
       throw new Error('Deck name is required.')
     }
     if (this.title.trim().length > Deck.MAX_TITLE_LENGTH) {
       throw new Error('Deck name cannot exceed 24 characters')
     }
-    if (this.sideLabels.length !== 2 && this.sideLabels.length !== 3) {
+    if (
+      !Array.isArray(this.sideLabels) ||
+      (this.sideLabels.length !== 2 && this.sideLabels.length !== 3)
+    ) {
       throw new Error('A deck must have exactly two or three side labels.')
     }
-    if (this.sideLabels.some((label) => !label.trim())) {
+    if (this.sideLabels.some((label) => typeof label !== 'string' || !label.trim())) {
       throw new Error('All deck side labels are required.')
+    }
+    if (
+      this.sideLabels.some(
+        (label) => databaseCharacterLength(label.trim()) > Deck.MAX_SIDE_LABEL_LENGTH,
+      )
+    ) {
+      throw new Error(`Deck side labels cannot exceed ${Deck.MAX_SIDE_LABEL_LENGTH} characters.`)
     }
   }
 
@@ -204,22 +222,34 @@ export class Deck {
     }
     try {
       const sideLabels = json.side_labels
-      if (
-        sideLabels !== undefined &&
-        sideLabels !== null &&
-        (!Array.isArray(sideLabels) ||
-          !sideLabels.every((label): label is string => typeof label === 'string'))
-      ) {
+      const title = requiredString(json, 'title', 'Deck')
+      if (!Array.isArray(sideLabels)) {
         throw new Error('Invalid raw data: Invalid side_labels to parse Deck.')
+      }
+      const parsedSideLabels = sideLabels.map((label): string => {
+        if (
+          typeof label !== 'string' ||
+          !label.trim() ||
+          databaseCharacterLength(label) > Deck.MAX_SIDE_LABEL_LENGTH
+        ) {
+          throw new Error('Invalid raw data: Invalid side_labels to parse Deck.')
+        }
+        return label
+      })
+      if (parsedSideLabels.length !== 2 && parsedSideLabels.length !== 3) {
+        throw new Error('Invalid raw data: Invalid side_labels to parse Deck.')
+      }
+      if (databaseCharacterLength(title) > Deck.MAX_DATABASE_TITLE_LENGTH) {
+        throw new Error('Invalid raw data: Deck title exceeds the database limit.')
       }
 
       return new Deck(
         requiredString(json, 'id', 'Deck'),
         requiredString(json, 'user_id', 'Deck'),
-        requiredString(json, 'title', 'Deck'),
-        sideLabels ?? ['Side 1', 'Side 2', 'Side 3'],
-        optionalDate(json, 'created_at', 'Deck'),
-        optionalDate(json, 'updated_at', 'Deck'),
+        title,
+        parsedSideLabels,
+        requiredDate(json, 'created_at', 'Deck'),
+        requiredDate(json, 'updated_at', 'Deck'),
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Deck from JSON: ${errorMessage(error)}`)

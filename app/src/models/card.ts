@@ -1,5 +1,11 @@
 import { supabase } from '@/db/supabase'
-import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
+import {
+  databaseCharacterLength,
+  errorMessage,
+  isDatabaseRecord,
+  requiredDate,
+  requiredString,
+} from '@/models/modelUtils'
 
 /**
  * @summary Represents the content structure of a 3-sided study card.
@@ -15,6 +21,7 @@ export interface CardContent {
  */
 export class Card {
   public static readonly MAX_SIDE_LENGTH = 256
+  private static readonly MAX_TAGS = 10
 
   constructor(
     public readonly id: string | null,
@@ -114,9 +121,17 @@ export class Card {
    * @throws {Error} If identifiers or side content violate card requirements.
    */
   private validate(): void {
-    if (!this.deckId || !this.deckId.trim() || !this.userId || !this.userId.trim()) {
+    if (
+      typeof this.deckId !== 'string' ||
+      !this.deckId.trim() ||
+      typeof this.userId !== 'string' ||
+      !this.userId.trim()
+    ) {
       throw new Error('Cannot save Card: Missing required fields (deckId or userId).')
     }
+
+    Card.validateContent(this.content, true)
+    Card.validateTagIds(this.tagIds)
 
     const normalizedContent = this.normalizeContent()
     const sides = Object.entries(normalizedContent)
@@ -141,6 +156,48 @@ export class Card {
       if (value) content[side] = value
     }
     return content
+  }
+
+  private static validateContent(
+    content: unknown,
+    allowUndefinedValues = false,
+  ): asserts content is CardContent {
+    if (!isDatabaseRecord(content)) {
+      throw new Error('Card content must be an object containing valid side text.')
+    }
+
+    for (const [side, value] of Object.entries(content)) {
+      if (side !== 's1' && side !== 's2' && side !== 's3') {
+        throw new Error(`Invalid card side: ${side}.`)
+      }
+      if (
+        (value === undefined && !allowUndefinedValues) ||
+        (value !== undefined && typeof value !== 'string')
+      ) {
+        throw new Error(`Card content for ${side} must be text.`)
+      }
+      if (typeof value === 'string' && databaseCharacterLength(value) > Card.MAX_SIDE_LENGTH) {
+        throw new Error(`Card sides cannot exceed ${Card.MAX_SIDE_LENGTH} characters.`)
+      }
+    }
+  }
+
+  private static validateTagIds(tagIds: unknown): asserts tagIds is string[] {
+    if (!Array.isArray(tagIds)) {
+      throw new Error(
+        `Card tag IDs must be unique, non-empty strings with a maximum of ${Card.MAX_TAGS} tags.`,
+      )
+    }
+    const ids: unknown[] = tagIds
+    if (
+      ids.length > Card.MAX_TAGS ||
+      !ids.every((tagId: unknown) => typeof tagId === 'string' && tagId.trim().length > 0) ||
+      new Set<unknown>(ids).size !== ids.length
+    ) {
+      throw new Error(
+        `Card tag IDs must be unique, non-empty strings with a maximum of ${Card.MAX_TAGS} tags.`,
+      )
+    }
   }
 
   /**
@@ -283,7 +340,12 @@ export class Card {
   private static async fetchTagIdsForCard(cardId: string): Promise<string[]> {
     const { data, error } = await supabase.from('card_tag').select('tag_id').eq('card_id', cardId)
 
-    if (error || !data) return []
+    if (error) {
+      throw new Error(`Database error while fetching card tags: ${error.message}`)
+    }
+    if (!data) {
+      throw new Error('Database error while fetching card tags: No data returned.')
+    }
     return data.map((row) => row.tag_id)
   }
 
@@ -300,32 +362,17 @@ export class Card {
     }
     try {
       const content = json.content
-      if (content !== undefined && content !== null && !isDatabaseRecord(content)) {
-        throw new Error('Invalid raw data: Invalid content to parse Card.')
-      }
-
-      const cardContent = content
-        ? (Object.fromEntries(
-            Object.entries(content).map(([key, value]) => {
-              if (key !== 's1' && key !== 's2' && key !== 's3') {
-                throw new Error(`Invalid raw data: Invalid card side ${key}.`)
-              }
-              if (typeof value !== 'string') {
-                throw new Error(`Invalid raw data: Invalid card content for ${key}.`)
-              }
-              return [key, value]
-            }),
-          ) as CardContent)
-        : {}
+      Card.validateContent(content)
+      Card.validateTagIds(tagIds)
 
       return new Card(
         requiredString(json, 'id', 'Card'),
         requiredString(json, 'deck_id', 'Card'),
         requiredString(json, 'user_id', 'Card'),
-        cardContent,
+        content,
         tagIds,
-        optionalDate(json, 'created_at', 'Card'),
-        optionalDate(json, 'updated_at', 'Card'),
+        requiredDate(json, 'created_at', 'Card'),
+        requiredDate(json, 'updated_at', 'Card'),
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Card from JSON: ${errorMessage(error)}`)

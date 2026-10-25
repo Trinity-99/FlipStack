@@ -52,6 +52,10 @@ describe('Deck', () => {
     ['one side label', new Deck(null, 'user-1', 'Thai', ['Script'], null, null)],
     ['four side labels', new Deck(null, 'user-1', 'Thai', ['A', 'B', 'C', 'D'], null, null)],
     ['blank side label', new Deck(null, 'user-1', 'Thai', ['Script', '  '], null, null)],
+    [
+      'overlong side label',
+      new Deck(null, 'user-1', 'Thai', ['x'.repeat(33), 'Meaning'], null, null),
+    ],
   ])('rejects invalid %s before contacting the database', async (_description, deck) => {
     await expect(deck.save()).rejects.toThrow(/.+/)
 
@@ -90,5 +94,29 @@ describe('Deck', () => {
     expect(deck.title).toBe('Thai')
     expect(deck.sideLabels).toEqual(sideLabels)
     expect(deck.id).toBe('deck-1')
+  })
+
+  it('rejects database rows with invalid side labels or missing required fields', () => {
+    const validRow = {
+      id: 'deck-1',
+      user_id: 'user-1',
+      title: 'Thai',
+      side_labels: ['Script', 'Meaning'],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }
+
+    expect(() => Deck.fromJSON({ ...validRow, side_labels: ['x'.repeat(33), 'Meaning'] })).toThrow(
+      /Failed to parse Deck from JSON/,
+    )
+    expect(() => Deck.fromJSON({ ...validRow, side_labels: ['Script'] })).toThrow(
+      /Failed to parse Deck from JSON/,
+    )
+    expect(() => Deck.fromJSON({ ...validRow, updated_at: null })).toThrow(
+      /Failed to parse Deck from JSON/,
+    )
+    expect(() => Deck.fromJSON({ ...validRow, title: 'x'.repeat(33) })).toThrow(
+      /Failed to parse Deck from JSON/,
+    )
   })
 })

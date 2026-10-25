@@ -1,15 +1,23 @@
 import { supabase } from '@/db/supabase'
-import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
+import {
+  databaseCharacterLength,
+  errorMessage,
+  isDatabaseRecord,
+  requiredDate,
+  requiredString,
+} from '@/models/modelUtils'
 
 /**
  * @summary Represents a learning topic tag associated with a deck with active record persistence.
  */
 export class Tag {
+  private static readonly MAX_NAME_LENGTH = 32
+
   constructor(
     public readonly id: string | null,
     public readonly deckId: string,
     public name: string,
-    public readonly createdAt: Date | null
+    public readonly createdAt: Date | null,
   ) {}
 
   /**
@@ -18,8 +26,14 @@ export class Tag {
    * @throws {Error} If required fields are missing or the database operation fails.
    */
   public async save(): Promise<void> {
-    if (!this.deckId || !this.name || this.name.trim() === '') {
-      throw new Error('Cannot save Tag: Missing required fields (deckId or name).');
+    if (typeof this.deckId !== 'string' || !this.deckId.trim()) {
+      throw new Error('Cannot save Tag: Missing required deckId.')
+    }
+    if (typeof this.name !== 'string' || !this.name.trim()) {
+      throw new Error('Cannot save Tag: Missing required fields (deckId or name).')
+    }
+    if (databaseCharacterLength(this.name.trim()) > Tag.MAX_NAME_LENGTH) {
+      throw new Error(`Tag name cannot exceed ${Tag.MAX_NAME_LENGTH} characters.`)
     }
 
     try {
@@ -32,16 +46,18 @@ export class Tag {
             name: this.name.trim(),
           })
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while inserting tag: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while inserting tag: ${error?.message || 'No data returned'}`,
+          )
         }
 
         Object.assign(this, {
           id: data.id,
           createdAt: new Date(data.created_at),
-        });
+        })
       } else {
         // UPDATE existing tag
         const { data, error } = await supabase
@@ -51,15 +67,17 @@ export class Tag {
           })
           .eq('id', this.id)
           .select()
-          .single();
+          .single()
 
         if (error || !data) {
-          throw new Error(`Database error while updating tag: ${error?.message || 'No data returned'}`);
+          throw new Error(
+            `Database error while updating tag: ${error?.message || 'No data returned'}`,
+          )
         }
       }
     } catch (error: unknown) {
-      console.error('Tag.save failed:', error);
-      throw error;
+      console.error('Tag.save failed:', error)
+      throw error
     }
   }
 
@@ -70,21 +88,18 @@ export class Tag {
    */
   public async delete(): Promise<void> {
     if (!this.id) {
-      throw new Error('Cannot delete a tag that has not been saved to the database.');
+      throw new Error('Cannot delete a tag that has not been saved to the database.')
     }
 
     try {
-      const { error } = await supabase
-        .from('tag')
-        .delete()
-        .eq('id', this.id);
+      const { error } = await supabase.from('tag').delete().eq('id', this.id)
 
       if (error) {
-        throw new Error(`Database error while deleting tag: ${error.message}`);
+        throw new Error(`Database error while deleting tag: ${error.message}`)
       }
     } catch (error: unknown) {
-      console.error(`Tag.delete failed for ID ${this.id}:`, error);
-      throw error;
+      console.error(`Tag.delete failed for ID ${this.id}:`, error)
+      throw error
     }
   }
 
@@ -96,25 +111,21 @@ export class Tag {
    */
   public static async findById(tagId: string): Promise<Tag | null> {
     if (!tagId || tagId.trim() === '') {
-      throw new Error('Invalid tagId provided to Tag.findById.');
+      throw new Error('Invalid tagId provided to Tag.findById.')
     }
 
     try {
-      const { data, error } = await supabase
-        .from('tag')
-        .select('*')
-        .eq('id', tagId)
-        .single();
+      const { data, error } = await supabase.from('tag').select('*').eq('id', tagId).single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw new Error(`Database error while finding tag by ID: ${error.message}`);
+        if (error.code === 'PGRST116') return null
+        throw new Error(`Database error while finding tag by ID: ${error.message}`)
       }
 
-      return data ? Tag.fromJSON(data) : null;
+      return data ? Tag.fromJSON(data) : null
     } catch (error: unknown) {
-      console.error(`Tag.findById failed for ID ${tagId}:`, error);
-      throw error;
+      console.error(`Tag.findById failed for ID ${tagId}:`, error)
+      throw error
     }
   }
 
@@ -126,7 +137,7 @@ export class Tag {
    */
   public static async findAllForDeck(deckId: string): Promise<Tag[]> {
     if (!deckId || deckId.trim() === '') {
-      throw new Error('Invalid deckId provided to Tag.findAllForDeck.');
+      throw new Error('Invalid deckId provided to Tag.findAllForDeck.')
     }
 
     try {
@@ -134,16 +145,16 @@ export class Tag {
         .from('tag')
         .select('*')
         .eq('deck_id', deckId)
-        .order('name', { ascending: true });
+        .order('name', { ascending: true })
 
       if (error) {
-        throw new Error(`Database error while fetching deck tags: ${error.message}`);
+        throw new Error(`Database error while fetching deck tags: ${error.message}`)
       }
 
-      return (data || []).map(row => Tag.fromJSON(row));
+      return (data || []).map((row) => Tag.fromJSON(row))
     } catch (error: unknown) {
-      console.error('Tag.findAllForDeck failed:', error);
-      throw error;
+      console.error('Tag.findAllForDeck failed:', error)
+      throw error
     }
   }
 
@@ -158,12 +169,17 @@ export class Tag {
       throw new Error('Invalid raw data: Cannot parse Tag from a non-object value.')
     }
     try {
+      const name = requiredString(json, 'name', 'Tag')
+      if (databaseCharacterLength(name) > Tag.MAX_NAME_LENGTH) {
+        throw new Error(`Invalid raw data: Tag name exceeds ${Tag.MAX_NAME_LENGTH} characters.`)
+      }
+
       return new Tag(
         requiredString(json, 'id', 'Tag'),
         requiredString(json, 'deck_id', 'Tag'),
-        requiredString(json, 'name', 'Tag'),
-        optionalDate(json, 'created_at', 'Tag')
-      );
+        name,
+        requiredDate(json, 'created_at', 'Tag'),
+      )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Tag from JSON: ${errorMessage(error)}`)
     }

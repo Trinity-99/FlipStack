@@ -1,5 +1,5 @@
 import { supabase } from '@/db/supabase'
-import { errorMessage, isDatabaseRecord, optionalDate, requiredString } from '@/models/modelUtils'
+import { errorMessage, isDatabaseRecord, requiredDate, requiredString } from '@/models/modelUtils'
 
 /**
  * @summary Represents learning progress counters (0–10) per user, card, and direction with active record persistence.
@@ -11,10 +11,10 @@ export class CardProgress {
     public readonly cardId: string,
     public readonly directionId: string,
     public counter: number,
-    public lastUpdated: Date
+    public lastUpdated: Date,
   ) {
-    if (counter < 0 || counter > 10) {
-      throw new Error(`Invalid counter value: ${counter}. Must be between 0 and 10.`);
+    if (!Number.isInteger(counter) || counter < 0 || counter > 10) {
+      throw new Error(`Invalid counter value: ${counter}. Must be between 0 and 10.`)
     }
   }
 
@@ -23,7 +23,7 @@ export class CardProgress {
    * @returns {number} Numerical weight for random weighted draw.
    */
   public getWeight(): number {
-    return Math.max(0, 10 - this.counter);
+    return Math.max(0, 10 - this.counter)
   }
 
   /**
@@ -31,8 +31,8 @@ export class CardProgress {
    */
   public increment(): void {
     if (this.counter < 10) {
-      this.counter += 1;
-      this.lastUpdated = new Date();
+      this.counter += 1
+      this.lastUpdated = new Date()
     }
   }
 
@@ -41,8 +41,8 @@ export class CardProgress {
    */
   public decrement(): void {
     if (this.counter > 0) {
-      this.counter -= 1;
-      this.lastUpdated = new Date();
+      this.counter -= 1
+      this.lastUpdated = new Date()
     }
   }
 
@@ -52,8 +52,23 @@ export class CardProgress {
    * @throws {Error} If required fields are missing or the database operation fails.
    */
   public async save(): Promise<void> {
-    if (!this.userId || !this.cardId || !this.directionId) {
-      throw new Error('Cannot save CardProgress: Missing required relational identifiers.');
+    if (
+      typeof this.userId !== 'string' ||
+      !this.userId.trim() ||
+      typeof this.cardId !== 'string' ||
+      !this.cardId.trim() ||
+      typeof this.directionId !== 'string' ||
+      !this.directionId.trim()
+    ) {
+      throw new Error('Cannot save CardProgress: Missing required relational identifiers.')
+    }
+    if (!Number.isInteger(this.counter) || this.counter < 0 || this.counter > 10) {
+      throw new Error(
+        `Invalid counter value: ${this.counter}. Must be an integer between 0 and 10.`,
+      )
+    }
+    if (!(this.lastUpdated instanceof Date) || Number.isNaN(this.lastUpdated.getTime())) {
+      throw new Error('Cannot save CardProgress: Invalid lastUpdated date.')
     }
 
     try {
@@ -67,23 +82,25 @@ export class CardProgress {
             counter: this.counter,
             last_updated: this.lastUpdated.toISOString(),
           },
-          { onConflict: 'user_id,card_id,direction_id' }
+          { onConflict: 'user_id,card_id,direction_id' },
         )
         .select()
-        .single();
+        .single()
 
       if (error || !data) {
-        throw new Error(`Database error while saving card progress: ${error?.message || 'No data returned'}`);
+        throw new Error(
+          `Database error while saving card progress: ${error?.message || 'No data returned'}`,
+        )
       }
 
       Object.assign(this, {
         id: data.id,
         counter: data.counter,
         lastUpdated: new Date(data.last_updated),
-      });
+      })
     } catch (error: unknown) {
-      console.error('CardProgress.save failed:', error);
-      throw error;
+      console.error('CardProgress.save failed:', error)
+      throw error
     }
   }
 
@@ -94,21 +111,18 @@ export class CardProgress {
    */
   public async delete(): Promise<void> {
     if (!this.id) {
-      throw new Error('Cannot delete a progress record that has not been saved to the database.');
+      throw new Error('Cannot delete a progress record that has not been saved to the database.')
     }
 
     try {
-      const { error } = await supabase
-        .from('card_progress')
-        .delete()
-        .eq('id', this.id);
+      const { error } = await supabase.from('card_progress').delete().eq('id', this.id)
 
       if (error) {
-        throw new Error(`Database error while deleting card progress: ${error.message}`);
+        throw new Error(`Database error while deleting card progress: ${error.message}`)
       }
     } catch (error: unknown) {
-      console.error(`CardProgress.delete failed for ID ${this.id}:`, error);
-      throw error;
+      console.error(`CardProgress.delete failed for ID ${this.id}:`, error)
+      throw error
     }
   }
 
@@ -123,10 +137,10 @@ export class CardProgress {
   public static async findForUserCardAndDirection(
     userId: string,
     cardId: string,
-    directionId: string
+    directionId: string,
   ): Promise<CardProgress | null> {
     if (!userId || !cardId || !directionId) {
-      throw new Error('Missing parameters provided to findForUserCardAndDirection.');
+      throw new Error('Missing parameters provided to findForUserCardAndDirection.')
     }
 
     try {
@@ -136,17 +150,17 @@ export class CardProgress {
         .eq('user_id', userId)
         .eq('card_id', cardId)
         .eq('direction_id', directionId)
-        .single();
+        .single()
 
       if (error) {
-        if (error.code === 'PGRST116') return null;
-        throw new Error(`Database error while finding card progress: ${error.message}`);
+        if (error.code === 'PGRST116') return null
+        throw new Error(`Database error while finding card progress: ${error.message}`)
       }
 
-      return data ? CardProgress.fromJSON(data) : null;
+      return data ? CardProgress.fromJSON(data) : null
     } catch (error: unknown) {
-      console.error('CardProgress.findForUserCardAndDirection failed:', error);
-      throw error;
+      console.error('CardProgress.findForUserCardAndDirection failed:', error)
+      throw error
     }
   }
 
@@ -161,7 +175,7 @@ export class CardProgress {
       throw new Error('Invalid raw data: Cannot parse CardProgress from a non-object value.')
     }
     try {
-      const counter = json.counter ?? 0
+      const counter = json.counter
       if (typeof counter !== 'number' || !Number.isFinite(counter)) {
         throw new Error('Invalid raw data: Invalid counter to parse CardProgress.')
       }
@@ -172,7 +186,7 @@ export class CardProgress {
         requiredString(json, 'card_id', 'CardProgress'),
         requiredString(json, 'direction_id', 'CardProgress'),
         counter,
-        optionalDate(json, 'last_updated', 'CardProgress') ?? new Date()
+        requiredDate(json, 'last_updated', 'CardProgress'),
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse CardProgress from JSON: ${errorMessage(error)}`)
