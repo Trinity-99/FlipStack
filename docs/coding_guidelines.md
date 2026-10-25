@@ -53,6 +53,13 @@ These guidelines define how code is written in FlipStack. The structure of the s
 - Custom CSS is allowed only when utility classes are insufficient, and must be placed in `<style scoped>` blocks.
 
 
+### Reusable UI Components
+
+- **BottomNavigation** (`src/components/BottomNavigation.vue`): Core bottom navigation for study and card-list screens.
+- **DeckSwitcher** (`src/components/DeckSwitcher.vue`): Displays and switches the active deck in the app header.
+- **FeedbackBanner** (`src/components/FeedbackBanner.vue`): Fixed, animated success/error feedback that stays visible while scrolling.
+- **TagSelector** (`src/components/TagSelector.vue`): Selects tags available in the active deck.
+
 ## 4 Data Layer
 
 **Models**

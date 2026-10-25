@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import BottomNavigation from '@/components/BottomNavigation.vue'
 import DeckSwitcher from '@/components/DeckSwitcher.vue'
+import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 
@@ -83,12 +84,11 @@ watch(() => authStore.profile, initializeDecks, { immediate: true })
         </div>
       </header>
 
-      <div
+      <FeedbackBanner
         v-if="deckStore.error && !isImmersive"
-        class="mx-4 mt-4 rounded-xl border border-rose-500/50 bg-rose-950/90 px-4 py-3 text-sm text-rose-300"
-        role="alert"
+        :message="deckStore.error"
+        variant="error"
       >
-        {{ deckStore.error }}
         <button
           v-if="authStore.profile"
           type="button"
@@ -97,7 +97,7 @@ watch(() => authStore.profile, initializeDecks, { immediate: true })
         >
           Try again
         </button>
-      </div>
+      </FeedbackBanner>
 
       <main class="flex flex-1 flex-col px-4 py-5">
         <RouterView />

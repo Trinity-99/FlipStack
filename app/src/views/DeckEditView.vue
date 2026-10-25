@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FeedbackBanner from '@/components/FeedbackBanner.vue'
+import { useFeedback } from '@/composables/useFeedback'
 import { Deck } from '@/models/deck'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
@@ -21,8 +23,8 @@ const isOnline = ref(true)
 const isLoadingDeck = ref(false)
 const isSaving = ref(false)
 const isNavigating = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
+const feedback = useFeedback()
+const { message: feedbackMessage, variant: feedbackVariant } = feedback
 const loadedDeck = shallowRef<Deck | null>(null)
 const savedDeck = shallowRef<Deck | null>(null)
 const characterCount = computed(() => deckName.value.length)
@@ -42,7 +44,9 @@ const isFormDisabled = computed(
 async function loadDeck(id: string): Promise<void> {
   const profile = authStore.profile
   if (!profile) {
-    errorMessage.value = authStore.initializationError ?? 'Please sign in to edit this deck.'
+    feedback.showError(authStore.initializationError ?? 'Please sign in to edit this deck.', {
+      dismissOnEdit: true,
+    })
     return
   }
 
@@ -50,7 +54,7 @@ async function loadDeck(id: string): Promise<void> {
   try {
     const deck = await Deck.findById(id)
     if (!deck || deck.userId !== profile.id) {
-      errorMessage.value = 'Unable to find this deck.'
+      feedback.showError('Unable to find this deck.', { dismissOnEdit: true })
       return
     }
 
@@ -64,7 +68,9 @@ async function loadDeck(id: string): Promise<void> {
     ]
   } catch (error: unknown) {
     console.error(`DeckEditView could not load deck ${id}:`, error)
-    errorMessage.value = 'Unable to load this deck. Please check your connection and try again.'
+    feedback.showError('Unable to load this deck. Please check your connection and try again.', {
+      dismissOnEdit: true,
+    })
   } finally {
     isLoadingDeck.value = false
   }
@@ -94,24 +100,25 @@ function validateForm(): string | null {
 async function handleSubmit(): Promise<void> {
   if (isSaving.value || isFormDisabled.value) return
 
-  errorMessage.value = ''
-  successMessage.value = ''
+  feedback.clear()
 
   const validationError = validateForm()
   if (validationError) {
-    errorMessage.value = validationError
+    feedback.showError(validationError, { dismissOnEdit: true })
     return
   }
 
   const profile = authStore.profile
   if (!profile) {
-    errorMessage.value = authStore.initializationError ?? 'Please sign in before saving a deck.'
+    feedback.showError(authStore.initializationError ?? 'Please sign in before saving a deck.', {
+      dismissOnEdit: true,
+    })
     return
   }
 
   const existingDeck = loadedDeck.value
   if (isEditMode.value && !existingDeck) {
-    errorMessage.value = 'Unable to edit this deck.'
+    feedback.showError('Unable to edit this deck.', { dismissOnEdit: true })
     return
   }
 
@@ -133,10 +140,12 @@ async function handleSubmit(): Promise<void> {
     await deck.save()
     deckStore.upsertDeck(deck)
     savedDeck.value = deck
-    successMessage.value = `Deck "${deck.title}" saved successfully`
+    feedback.showSuccess(`Deck "${deck.title}" saved successfully`)
   } catch (error: unknown) {
     console.error('DeckEditView could not save deck:', error)
-    errorMessage.value = 'Unable to save this deck. Please check your information and try again.'
+    feedback.showError('Unable to save this deck. Please check your information and try again.', {
+      dismissOnEdit: true,
+    })
   } finally {
     isSaving.value = false
   }
@@ -150,14 +159,17 @@ async function goToAddCards(): Promise<void> {
   const deck = savedDeck.value
   if (!deck?.id || isNavigating.value || !isOnline.value) return
 
-  errorMessage.value = ''
+  feedback.clear()
   isNavigating.value = true
   try {
     try {
       await deckStore.selectActiveDeck(deck.id)
     } catch (error: unknown) {
       console.error(`DeckEditView could not activate deck ${deck.id}:`, error)
-      errorMessage.value = `Deck "${deck.title}" was saved, but could not be activated. Please try again.`
+      feedback.showError(
+        `Deck "${deck.title}" was saved, but could not be activated. Please try again.`,
+        { dismissOnEdit: true },
+      )
       return
     }
 
@@ -165,7 +177,10 @@ async function goToAddCards(): Promise<void> {
       await router.push({ name: 'CardCreate' })
     } catch (error: unknown) {
       console.error(`DeckEditView could not open card creation for deck ${deck.id}:`, error)
-      errorMessage.value = `Deck "${deck.title}" is active, but the card creation screen could not be opened. Please try again.`
+      feedback.showError(
+        `Deck "${deck.title}" is active, but the card creation screen could not be opened. Please try again.`,
+        { dismissOnEdit: true },
+      )
     }
   } finally {
     isNavigating.value = false
@@ -178,12 +193,23 @@ function resetForm(): void {
   deckName.value = ''
   sideCount.value = 3
   sideLabels.value = ['', '', '']
-  errorMessage.value = ''
-  successMessage.value = ''
+  feedback.clear()
 }
 
 function updateOnlineStatus(): void {
   isOnline.value = navigator.onLine
+}
+
+/**
+ * @summary Updates the selected side count and dismisses edit-cleared feedback.
+ * @param {2 | 3} count - The number of sides to show.
+ * @returns {void}
+ */
+function selectSideCount(count: 2 | 3): void {
+  if (sideCount.value === count) return
+
+  sideCount.value = count
+  feedback.clearOnEdit()
 }
 
 watch(
@@ -227,27 +253,12 @@ onUnmounted(() => {
       Please connect to the Internet — offline data entry is not supported
     </div>
 
-    <div
-      v-if="errorMessage"
-      class="mb-5 rounded-xl border border-rose-500/50 bg-rose-950/90 px-4 py-3 text-sm text-rose-300"
-      role="alert"
-      aria-live="assertive"
-    >
-      {{ errorMessage }}
-    </div>
-
-    <div
-      v-if="successMessage"
-      class="mb-5 rounded-xl border border-accent-got-it/50 bg-accent-got-it/10 px-4 py-3 text-sm text-accent-got-it"
-      role="status"
-      aria-live="polite"
-    >
-      {{ successMessage }}
-    </div>
+    <FeedbackBanner :message="feedbackMessage" :variant="feedbackVariant" />
 
     <form
       novalidate
       class="rounded-card border-2 border-slate-600 bg-card p-6 shadow-2xl"
+      @input="feedback.clearOnEdit"
       @submit.prevent="handleSubmit"
     >
       <fieldset :disabled="isFormDisabled" class="space-y-5">
@@ -285,7 +296,7 @@ onUnmounted(() => {
                   ? 'border-brand-primary bg-brand-primary text-white'
                   : 'border-border-subtle bg-surface-muted text-primary'
               "
-              @click="sideCount = 2"
+              @click="selectSideCount(2)"
             >
               2 sides
             </button>
@@ -298,7 +309,7 @@ onUnmounted(() => {
                   ? 'border-brand-primary bg-brand-primary text-white'
                   : 'border-border-subtle bg-surface-muted text-primary'
               "
-              @click="sideCount = 3"
+              @click="selectSideCount(3)"
             >
               3 sides
             </button>

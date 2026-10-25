@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import { Card } from '@/models/card'
@@ -8,6 +8,7 @@ import { Direction } from '@/models/direction'
 import { Tag } from '@/models/tag'
 import { Profile } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
+import { useDeckStore } from '@/stores/deckStore'
 import AppLayout from '@/layouts/AppLayout.vue'
 
 const layoutRouter = createRouter({
@@ -94,6 +95,22 @@ describe('AppLayout', () => {
     expect(wrapper.get('[aria-label="Select active deck"]').find('svg').exists()).toBe(false)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Card editor content')
+  })
+
+  it('shows deck loading failures in the shared feedback banner', async () => {
+    const deckStore = useDeckStore()
+    deckStore.error = 'Unable to load your decks. Please try again.'
+    vi.spyOn(deckStore, 'initialize').mockResolvedValue()
+    useAuthStore().profile = new Profile('user-1', new Date(), new Date())
+    const wrapper = mount(AppLayout, { global: { plugins: [layoutRouter] } })
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'Unable to load your decks. Please try again.',
+    )
+    expect(wrapper.find('.feedback-banner').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').find('button').exists()).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Try again')).toBe(true)
   })
 
   it('initializes deck data when an authenticated profile exists', async () => {

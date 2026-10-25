@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import TagSelector from '@/components/TagSelector.vue'
+import { useFeedback } from '@/composables/useFeedback'
 import { Card } from '@/models/card'
 import type { CardContent } from '@/models/card'
 import { useAuthStore } from '@/stores/authStore'
@@ -38,10 +40,8 @@ const selectedTagIds = ref<string[]>([])
 const loadedCard = shallowRef<Card | null>(null)
 const isLoadingCard = ref(false)
 const isSaving = ref(false)
-const errorMessage = ref('')
-const isValidationError = ref(false)
-const isLengthLimitError = ref(false)
-const successMessage = ref('')
+const feedback = useFeedback()
+const { message: feedbackMessage, variant: feedbackVariant } = feedback
 const firstSideInput = ref<HTMLTextAreaElement | null>(null)
 const isFormDisabled = computed(
   () =>
@@ -53,41 +53,14 @@ const isFormDisabled = computed(
     (isEditMode.value && !loadedCard.value),
 )
 
-let successTimeout: ReturnType<typeof setTimeout> | null = null
-let lengthLimitTimeout: ReturnType<typeof setTimeout> | null = null
-
-function clearSuccessTimeout(): void {
-  if (successTimeout !== null) {
-    clearTimeout(successTimeout)
-    successTimeout = null
-  }
-}
-
-function clearLengthLimitTimeout(): void {
-  if (lengthLimitTimeout !== null) {
-    clearTimeout(lengthLimitTimeout)
-    lengthLimitTimeout = null
-  }
-}
-
 /**
  * @summary Shows one brief error when a text insertion exceeds the side limit.
  * @returns {void}
  */
 function showLengthLimitError(): void {
-  if (isLengthLimitError.value) return
-
-  clearLengthLimitTimeout()
-  errorMessage.value = `Each side is limited to ${Card.MAX_SIDE_LENGTH} characters.`
-  isValidationError.value = false
-  isLengthLimitError.value = true
-  lengthLimitTimeout = setTimeout(() => {
-    if (isLengthLimitError.value) {
-      errorMessage.value = ''
-      isLengthLimitError.value = false
-    }
-    lengthLimitTimeout = null
-  }, 2000)
+  feedback.showError(`Each side is limited to ${Card.MAX_SIDE_LENGTH} characters.`, {
+    durationMs: 2000,
+  })
 }
 
 /**
@@ -135,10 +108,7 @@ function handleSideBeforeInput(event: InputEvent): void {
  * @returns {void}
  */
 function clearValidationError(): void {
-  if (!isValidationError.value) return
-
-  errorMessage.value = ''
-  isValidationError.value = false
+  feedback.clearOnEdit()
 }
 
 function contentForDeck(source: CardContent, sideCount: number): CardContent {
@@ -159,7 +129,7 @@ function contentForDeck(source: CardContent, sideCount: number): CardContent {
 async function loadCard(id: string, deckId: string): Promise<void> {
   const profile = authStore.profile
   if (!profile) {
-    errorMessage.value = 'Please sign in before editing cards.'
+    feedback.showError('Please sign in before editing cards.')
     return
   }
 
@@ -167,7 +137,7 @@ async function loadCard(id: string, deckId: string): Promise<void> {
   try {
     const card = await Card.findById(id)
     if (!card || card.deckId !== deckId || card.userId !== profile.id) {
-      errorMessage.value = 'Unable to find this card in the active deck.'
+      feedback.showError('Unable to find this card in the active deck.')
       return
     }
 
@@ -176,7 +146,7 @@ async function loadCard(id: string, deckId: string): Promise<void> {
     selectedTagIds.value = [...card.tagIds]
   } catch (error: unknown) {
     console.error(`CardEditView could not load card ${id}:`, error)
-    errorMessage.value = 'Unable to load this card. Please try again.'
+    feedback.showError('Unable to load this card. Please try again.')
   } finally {
     isLoadingCard.value = false
   }
@@ -199,19 +169,16 @@ async function loadFormContext(
   loadedCard.value = null
   content.value = {}
   selectedTagIds.value = []
-  errorMessage.value = ''
-  isValidationError.value = false
-  isLengthLimitError.value = false
-  successMessage.value = ''
-  clearSuccessTimeout()
-  clearLengthLimitTimeout()
+  feedback.clear()
 
   if (!authStore.profile) {
-    errorMessage.value = 'Please sign in before creating or editing cards.'
+    feedback.showError('Please sign in before creating or editing cards.')
     return
   }
   if (!deckId) {
-    errorMessage.value = 'Select an active deck before creating or editing cards.'
+    if (!deckStore.error) {
+      feedback.showError('Select an active deck before creating or editing cards.')
+    }
     return
   }
   if (id) await loadCard(id, deckId)
@@ -240,30 +207,24 @@ function validateForm(): string | null {
 async function saveCard(action: SaveAction): Promise<void> {
   if (isFormDisabled.value || isSaving.value) return
 
-  clearSuccessTimeout()
-  clearLengthLimitTimeout()
-  errorMessage.value = ''
-  isValidationError.value = false
-  isLengthLimitError.value = false
-  successMessage.value = ''
+  feedback.clear()
 
   const validationError = validateForm()
   if (validationError) {
-    errorMessage.value = validationError
-    isValidationError.value = true
+    feedback.showError(validationError, { dismissOnEdit: true })
     return
   }
 
   const profile = authStore.profile
   const deck = activeDeck.value
   if (!profile || !deck?.id) {
-    errorMessage.value = 'Select an active deck and sign in before saving a card.'
+    feedback.showError('Select an active deck and sign in before saving a card.')
     return
   }
 
   const card = loadedCard.value
   if (isEditMode.value && (!card || card.deckId !== deck.id)) {
-    errorMessage.value = 'This card does not belong to the active deck.'
+    feedback.showError('This card does not belong to the active deck.')
     return
   }
 
@@ -288,18 +249,14 @@ async function saveCard(action: SaveAction): Promise<void> {
 
     if (action === 'createNext') {
       resetForm()
-      successMessage.value = 'Card saved successfully.'
-      successTimeout = setTimeout(() => {
-        successMessage.value = ''
-        successTimeout = null
-      }, 2000)
+      feedback.showSuccess('Card saved successfully.')
       return
     }
 
     await router.push({ name: 'CardList' })
   } catch (error: unknown) {
     console.error('CardEditView could not save card:', error)
-    errorMessage.value = 'Unable to save this card. Please try again.'
+    feedback.showError('Unable to save this card. Please try again.')
   } finally {
     isSaving.value = false
   }
@@ -312,10 +269,7 @@ async function saveCard(action: SaveAction): Promise<void> {
 function resetForm(): void {
   content.value = {}
   selectedTagIds.value = []
-  errorMessage.value = ''
-  isValidationError.value = false
-  isLengthLimitError.value = false
-  successMessage.value = ''
+  feedback.clear()
   void nextTick(() => firstSideInput.value?.focus())
 }
 
@@ -324,11 +278,6 @@ watch(
   ([id, deckId, isDeckLoading]) => loadFormContext(id, deckId, isDeckLoading),
   { immediate: true },
 )
-
-onUnmounted(() => {
-  clearSuccessTimeout()
-  clearLengthLimitTimeout()
-})
 </script>
 
 <template>
@@ -339,21 +288,7 @@ onUnmounted(() => {
       </h1>
     </header>
 
-    <Transition name="feedback">
-      <div
-        v-if="errorMessage || successMessage"
-        class="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+3.8125rem)] z-[60] mx-auto w-[calc(100%-2rem)] max-w-md rounded-xl border px-4 py-2 text-sm"
-        :class="
-          errorMessage
-            ? 'border-rose-500/50 bg-rose-950/95 text-rose-300'
-            : 'border-emerald-500/50 bg-emerald-950/95 text-emerald-300'
-        "
-        :role="errorMessage ? 'alert' : 'status'"
-        :aria-live="errorMessage ? 'assertive' : 'polite'"
-      >
-        {{ errorMessage || successMessage }}
-      </div>
-    </Transition>
+    <FeedbackBanner :message="feedbackMessage" :variant="feedbackVariant" />
 
     <form
       novalidate
@@ -442,25 +377,3 @@ onUnmounted(() => {
     </form>
   </section>
 </template>
-
-<style scoped>
-.feedback-enter-active,
-.feedback-leave-active {
-  transition:
-    opacity 680ms ease,
-    transform 680ms ease;
-}
-
-.feedback-enter-from,
-.feedback-leave-to {
-  opacity: 0;
-  transform: translateY(-0.5rem);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .feedback-enter-active,
-  .feedback-leave-active {
-    transition: none;
-  }
-}
-</style>

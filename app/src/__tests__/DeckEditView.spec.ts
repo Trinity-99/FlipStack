@@ -60,6 +60,7 @@ describe('DeckEditView', () => {
     await flushPromises()
 
     expect(wrapper.get('[role="status"]').text()).toContain('Deck "Thai" saved successfully')
+    expect(wrapper.find('.feedback-banner').exists()).toBe(true)
     expect(useDeckStore().decks[0]?.title).toBe('Thai')
     expect(router.currentRoute.value.name).toBe('DeckCreate')
 
@@ -95,6 +96,7 @@ describe('DeckEditView', () => {
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('was saved, but could not be activated')
+    expect(wrapper.find('.feedback-banner').exists()).toBe(true)
     expect(router.currentRoute.value.name).toBe('DeckCreate')
   })
 
@@ -131,6 +133,36 @@ describe('DeckEditView', () => {
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Deck name cannot exceed 24 characters')
     expect(save).not.toHaveBeenCalled()
+  })
+
+  it('clears an error when editing resumes', async () => {
+    const wrapper = mountView()
+
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.get('[role="alert"]').text()).toBe('Deck name is required.')
+
+    await wrapper.get('#deck-name').setValue('Thai')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('dismisses a save success banner after two seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    mockSuccessfulSave()
+    const wrapper = mountView()
+
+    await wrapper.get('#deck-name').setValue('Thai')
+    await wrapper.get('#side-label-1').setValue('Script')
+    await wrapper.get('#side-label-2').setValue('Meaning')
+    await wrapper.get('#side-label-3').setValue('Thai')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toContain('saved successfully')
+    await vi.advanceTimersByTimeAsync(1999)
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('loads an owned deck and updates it in the cache', async () => {

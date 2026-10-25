@@ -98,6 +98,18 @@ describe('CardEditView', () => {
     ).toEqual(['Front', 'Back'])
   })
 
+  it('does not cover the shell deck-retry banner with a redundant missing-deck error', async () => {
+    const deckStore = useDeckStore()
+    deckStore.decks = []
+    deckStore.activeDeckId = null
+    deckStore.error = 'Unable to load your decks. Please try again.'
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
   it('saves partial content, clears the form, shows success, and restores focus', async () => {
     const save = vi.spyOn(Card.prototype, 'save').mockResolvedValue()
     const upsertCard = vi.spyOn(useCardStore(), 'upsertCard').mockImplementation(() => {})
@@ -116,11 +128,10 @@ describe('CardEditView', () => {
     expect(wrapper.get('#card-side-1').element).toHaveProperty('value', '')
     expect(wrapper.get('button[aria-pressed="false"]').text()).toBe('Grammar')
     expect(wrapper.get('[role="status"]').text()).toBe('Card saved successfully.')
-    expect(wrapper.get('[role="status"]').classes()).toContain('fixed')
-    expect(wrapper.get('[role="status"]').classes()).toContain(
+    expect(wrapper.find('.feedback-banner').classes()).toContain(
       'top-[calc(env(safe-area-inset-top)+3.8125rem)]',
     )
-    expect(wrapper.get('[role="status"]').classes()).toContain('bg-emerald-950/95')
+    expect(wrapper.find('.feedback-banner').classes()).toContain('bg-emerald-950/95')
     expect(document.activeElement).toBe(wrapper.get('#card-side-1').element)
     wrapper.unmount()
   })
@@ -149,12 +160,11 @@ describe('CardEditView', () => {
     await clickButton(wrapper, 'Save & Create Next')
 
     expect(wrapper.get('[role="alert"]').text()).toBe('At least one side must contain text')
-    expect(wrapper.get('[role="alert"]').classes()).toContain('fixed')
-    expect(wrapper.get('[role="alert"]').classes()).toContain('z-[60]')
-    expect(wrapper.get('[role="alert"]').classes()).toContain(
+    expect(wrapper.find('.feedback-banner').classes()).toContain('z-[60]')
+    expect(wrapper.find('.feedback-banner').classes()).toContain(
       'top-[calc(env(safe-area-inset-top)+3.8125rem)]',
     )
-    expect(wrapper.get('[role="alert"]').classes()).toContain('bg-rose-950/95')
+    expect(wrapper.find('.feedback-banner').classes()).toContain('bg-rose-950/95')
     expect(save).not.toHaveBeenCalled()
 
     await wrapper.get('#card-side-1').setValue('Corrected')

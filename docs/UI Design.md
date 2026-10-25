@@ -31,7 +31,7 @@ All inline alert banners, feedback notifications, and state badges follow a stru
 ### Component Standard: Error & Alert Banners
 - **Bounded Container Requirement:** All inline validation messages, server error feedback, and alert banners MUST be rendered inside a bounded container (`bg-rose-950/90` or `bg-rose-950/40` with `border-rose-500/50`).
 - **Contrast & Legibility:** Banner text MUST use `text-rose-300` (`#FDA4AF`) or `text-rose-200` (`#FECDD3`) to guarantee a minimum contrast ratio of at least 4.5:1 (WCAG AA compliant) against dark card containers.
-- **Layout Placement:** Positioned directly above input fields or active form submit buttons inside card surfaces.
+- **Layout Placement:** Success and error feedback use the shared `FeedbackBanner` as a fixed overlay, so they remain visible while scrolling without shifting form content. It sits just below and slightly overlaps the sticky app header, above the main content. Its horizontal insets keep it aligned with the app's centered content width on larger viewports and preserve edge spacing on narrow screens. Interactive actions, such as retry buttons, sit outside the live announcement element. Login keeps its existing inline feedback for now.
 
 ## 1.3 Typography & Readability Standards
 - **Font Family & Localization:**
@@ -65,7 +65,7 @@ All primary cards, modals, and container elements must adhere to these standardi
 - Multi-line textareas may use a shorter default height on narrow screens and increase their minimum height at wider breakpoints. Keep textareas vertically resizable so users can expand fields when needed.
 - Preserve accessible touch targets for buttons and selectable controls when compacting forms; reduce surrounding whitespace and text-entry area before reducing action-control height.
 - Task-focused editing forms may hide the bottom navigation when it does not help complete the current task. Keep this route-scoped so core navigation remains available on the main study and card-list screens.
-- Form success and error feedback must remain visible while the user scrolls without moving the form. Show the message in a fixed, high-opacity banner directly below the sticky app header; keep it accessible with a polite status role for success and an assertive alert role for errors.
+- Success and error feedback must remain visible while the user scrolls without moving the form. Use the shared `FeedbackBanner` component, positioned as described in the banner layout guidance above. It uses a polite status role for success and an assertive alert role for errors. Keep interactive actions outside the live announcement element. Login retains its existing inline feedback for now.
 ---
 
 # 2. Main Navigation & App Architecture
