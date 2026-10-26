@@ -18,11 +18,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/cards',
         name: 'CardList',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
-        meta: {
-          placeholderTitle: 'Your Cards',
-          placeholderDescription: 'Browse, organize, and manage cards in your active deck.',
-        },
+        component: () => import('@/views/CardListView.vue'),
       },
       {
         path: '/decks/new',
