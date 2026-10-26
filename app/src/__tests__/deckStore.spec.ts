@@ -144,6 +144,82 @@ describe('useDeckStore', () => {
     )
   })
 
+  it('adds a saved direction to the active deck cache', () => {
+    const store = useDeckStore()
+    store.activeDeckId = 'deck-newer'
+    const direction = new Direction(
+      'direction-1',
+      'deck-newer',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      createdAt,
+    )
+
+    store.upsertDirection(direction)
+
+    expect(store.directions).toEqual([direction])
+  })
+
+  it('replaces a saved direction by ID', () => {
+    const store = useDeckStore()
+    store.activeDeckId = 'deck-newer'
+    const oldDirection = new Direction(
+      'direction-1',
+      'deck-newer',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      createdAt,
+    )
+    const updatedDirection = new Direction(
+      'direction-1',
+      'deck-newer',
+      [
+        { side: 2, role: 'question' },
+        { side: 1, role: 'answer' },
+      ],
+      createdAt,
+    )
+    store.directions = [oldDirection]
+
+    store.upsertDirection(updatedDirection)
+
+    expect(store.directions).toEqual([updatedDirection])
+  })
+
+  it('rejects unsaved and non-active-deck directions', () => {
+    const store = useDeckStore()
+    store.activeDeckId = 'deck-newer'
+    const unsavedDirection = new Direction(
+      null,
+      'deck-newer',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      null,
+    )
+    const otherDeckDirection = new Direction(
+      'direction-2',
+      'deck-older',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      createdAt,
+    )
+
+    expect(() => store.upsertDirection(unsavedDirection)).toThrow(
+      'Cannot add a direction to the cache before it has been saved.',
+    )
+    expect(() => store.upsertDirection(otherDeckDirection)).toThrow(
+      'does not belong to the active deck',
+    )
+  })
+
   it('retries initialization after deck data fails to load', async () => {
     const profile = new Profile('user-1', createdAt, createdAt, 'deck-newer')
     useAuthStore().setAuthenticated(profile, {

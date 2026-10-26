@@ -45,11 +45,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/study/init',
         name: 'SessionStart',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
-        meta: {
-          placeholderTitle: 'Start Studying',
-          placeholderDescription: 'Choose a study direction and topic for your next session.',
-        },
+        component: () => import('@/views/StudyInitView.vue'),
       },
       {
         path: '/study',

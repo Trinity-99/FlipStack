@@ -1,5 +1,4 @@
 import { supabase } from '@/db/supabase'
-import { Card } from '@/models/card'
 import { Deck } from '@/models/deck'
 import { errorMessage, isDatabaseRecord, requiredDate, requiredString } from '@/models/modelUtils'
 
@@ -35,57 +34,6 @@ export class Direction {
     }
 
     return this.configuration.map((step) => deck.getSideLabel(step.side)).join(' - ')
-  }
-
-  /**
-   * @summary Finds the designated Question step for this direction.
-   * @returns {DirectionStep | undefined} The direction step configured as the question, or undefined.
-   */
-  public getQuestionStep(): DirectionStep | undefined {
-    return this.configuration.find((step) => step.role === 'question')
-  }
-
-  /**
-   * @summary Retrieves all Answer steps required for this direction.
-   * @returns {DirectionStep[]} Array of answer steps.
-   */
-  public getAnswerSteps(): DirectionStep[] {
-    return this.configuration.filter((step) => step.role === 'answer')
-  }
-
-  /**
-   * @summary Evaluates if a card has sufficient content to be studied under this direction.
-   * @param {Card} card - The Card object to evaluate.
-   * @returns {boolean} True if the card satisfies the question and all required answer slots.
-   */
-  public isCardEligible(card: Card): boolean {
-    if (!card || !card.content) return false
-
-    try {
-      const questionStep = this.getQuestionStep()
-      const answerSteps = this.getAnswerSteps()
-
-      if (!questionStep) return false
-
-      // Question side must have content
-      const questionVal = card.content[`s${questionStep.side}` as keyof typeof card.content]
-      if (!questionVal || questionVal.trim().length === 0) {
-        return false
-      }
-
-      // All answer sides must have content
-      for (const ansStep of answerSteps) {
-        const ansVal = card.content[`s${ansStep.side}` as keyof typeof card.content]
-        if (!ansVal || ansVal.trim().length === 0) {
-          return false
-        }
-      }
-
-      return true
-    } catch (error: unknown) {
-      console.error('Error evaluating card eligibility:', error)
-      return false
-    }
   }
 
   /**

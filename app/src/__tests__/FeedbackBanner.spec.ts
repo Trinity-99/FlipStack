@@ -37,6 +37,21 @@ describe('FeedbackBanner', () => {
     expect(wrapper.get('button').text()).toBe('Try again')
   })
 
+  it('shows warnings as yellow assertive alert banners', () => {
+    const wrapper = mount(FeedbackBanner, {
+      props: {
+        message: 'No cards match this study direction.',
+        variant: 'warning',
+      },
+    })
+
+    expect(wrapper.get('[role="alert"]').text()).toBe('No cards match this study direction.')
+    expect(wrapper.get('[role="alert"]').attributes('aria-live')).toBe('assertive')
+    expect(wrapper.find('.feedback-banner').classes()).toContain('border-amber-500/50')
+    expect(wrapper.find('.feedback-banner').classes()).toContain('bg-amber-950/95')
+    expect(wrapper.find('.feedback-banner').classes()).toContain('text-amber-300')
+  })
+
   it('does not render an empty message', () => {
     const wrapper = mount(FeedbackBanner, {
       props: {

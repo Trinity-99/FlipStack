@@ -165,6 +165,81 @@ export class CardProgress {
   }
 
   /**
+   * @summary Retrieves all progress records for a user and saved study direction.
+   * @param {string} userId - The authenticated user's UUID.
+   * @param {string} directionId - The saved direction UUID.
+   * @returns {Promise<CardProgress[]>} The matching progress records, or an empty array.
+   * @throws {Error} If identifiers are invalid or the database query fails.
+   */
+  public static async findAllForUserAndDirection(
+    userId: string,
+    directionId: string,
+  ): Promise<CardProgress[]> {
+    if (!userId?.trim() || !directionId?.trim()) {
+      throw new Error('Missing parameters provided to CardProgress.findAllForUserAndDirection.')
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('card_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('direction_id', directionId)
+
+      if (error) {
+        throw new Error(`Database error while fetching card progress: ${error.message}`)
+      }
+
+      return (data ?? []).map((row) => CardProgress.fromJSON(row))
+    } catch (error: unknown) {
+      console.error('CardProgress.findAllForUserAndDirection failed:', error)
+      throw error
+    }
+  }
+
+  /**
+   * @summary Resets existing progress records for selected cards and a direction.
+   * @param {string} userId - The authenticated user's UUID.
+   * @param {string[]} cardIds - The eligible card UUIDs to reset.
+   * @param {string} directionId - The saved direction UUID.
+   * @returns {Promise<void>} A promise that resolves when matching progress is reset.
+   * @throws {Error} If identifiers are invalid or the database update fails.
+   */
+  public static async resetForUserCardsAndDirection(
+    userId: string,
+    cardIds: string[],
+    directionId: string,
+  ): Promise<void> {
+    if (!userId?.trim() || !directionId?.trim()) {
+      throw new Error('Missing parameters provided to CardProgress.resetForUserCardsAndDirection.')
+    }
+    if (
+      !Array.isArray(cardIds) ||
+      !cardIds.every((cardId) => typeof cardId === 'string' && cardId.trim().length > 0) ||
+      new Set(cardIds).size !== cardIds.length
+    ) {
+      throw new Error('Card IDs must be unique, non-empty strings.')
+    }
+    if (cardIds.length === 0) return
+
+    try {
+      const { error } = await supabase
+        .from('card_progress')
+        .update({ counter: 0, last_updated: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('direction_id', directionId)
+        .in('card_id', cardIds)
+
+      if (error) {
+        throw new Error(`Database error while resetting card progress: ${error.message}`)
+      }
+    } catch (error: unknown) {
+      console.error('CardProgress.resetForUserCardsAndDirection failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * @summary Instantiates a CardProgress object from a raw database record.
    * @param {unknown} json - The raw database JSON object from Supabase.
    * @returns {CardProgress} A fully typed CardProgress instance.

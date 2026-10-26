@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type FeedbackBannerVariant = 'error' | 'success'
+type FeedbackBannerVariant = 'error' | 'success' | 'warning'
 
 const props = defineProps<{
   message: string
   variant: FeedbackBannerVariant
 }>()
 
-const variantClasses = computed(() =>
-  props.variant === 'error'
-    ? 'border-rose-500/50 bg-rose-950/95 text-rose-300'
-    : 'border-emerald-500/50 bg-emerald-950/95 text-emerald-300',
-)
-const role = computed(() => (props.variant === 'error' ? 'alert' : 'status'))
-const liveMode = computed(() => (props.variant === 'error' ? 'assertive' : 'polite'))
+const variantClasses = computed(() => {
+  if (props.variant === 'error') return 'border-rose-500/50 bg-rose-950/95 text-rose-300'
+  if (props.variant === 'warning') return 'border-amber-500/50 bg-amber-950/95 text-amber-300'
+  return 'border-emerald-500/50 bg-emerald-950/95 text-emerald-300'
+})
+const isAlert = computed(() => props.variant !== 'success')
+const role = computed(() => (isAlert.value ? 'alert' : 'status'))
+const liveMode = computed(() => (isAlert.value ? 'assertive' : 'polite'))
 </script>
 
 <template>

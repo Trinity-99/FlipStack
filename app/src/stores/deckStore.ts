@@ -147,6 +147,33 @@ export const useDeckStore = defineStore('decks', () => {
   }
 
   /**
+   * @summary Adds or replaces a saved direction in the active deck cache.
+   * @param {Direction} direction - The persisted direction to synchronize.
+   * @returns {void}
+   * @throws {Error} If the direction is unsaved or does not belong to the active deck.
+   */
+  function upsertDirection(direction: Direction): void {
+    if (!direction.id) {
+      throw new Error('Cannot add a direction to the cache before it has been saved.')
+    }
+    if (!activeDeckId.value || direction.deckId !== activeDeckId.value) {
+      throw new Error('Cannot add a direction that does not belong to the active deck.')
+    }
+
+    const existingIndex = directions.value.findIndex(
+      (cachedDirection) => cachedDirection.id === direction.id,
+    )
+    if (existingIndex === -1) {
+      directions.value = [...directions.value, direction]
+      return
+    }
+
+    directions.value = directions.value.map((cachedDirection, index) =>
+      index === existingIndex ? direction : cachedDirection,
+    )
+  }
+
+  /**
    * @summary Switches the active deck after its data and saved preference load successfully.
    * @param {string} deckId - The UUID of the deck to activate.
    * @returns {Promise<void>} A promise that resolves when the deck is active.
@@ -217,6 +244,7 @@ export const useDeckStore = defineStore('decks', () => {
     selectActiveDeck,
     loadActiveDeckData,
     upsertDeck,
+    upsertDirection,
     retryLoad,
   }
 })
