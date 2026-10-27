@@ -50,12 +50,8 @@ const routes: RouteRecordRaw[] = [
       {
         path: '/study',
         name: 'Study',
-        component: () => import('@/views/FeaturePlaceholderView.vue'),
-        meta: {
-          immersive: true,
-          placeholderTitle: 'Study Session',
-          placeholderDescription: 'Your active study session will appear here.',
-        },
+        component: () => import('@/views/StudyView.vue'),
+        meta: { immersive: true },
       },
     ],
   },

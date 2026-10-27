@@ -99,7 +99,7 @@ watch(() => authStore.profile, initializeDecks, { immediate: true })
         </button>
       </FeedbackBanner>
 
-      <main class="flex flex-1 flex-col px-4 py-5">
+      <main class="flex flex-1 flex-col" :class="isImmersive ? 'p-0' : 'px-4 py-5'">
         <RouterView />
       </main>
 

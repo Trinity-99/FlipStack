@@ -19,34 +19,6 @@ export class CardProgress {
   }
 
   /**
-   * @summary Computes the selection weight for the continuous learning stream (Weight = 10 - counter).
-   * @returns {number} Numerical weight for random weighted draw.
-   */
-  public getWeight(): number {
-    return Math.max(0, 10 - this.counter)
-  }
-
-  /**
-   * @summary Increments counter by 1 ("Got It" action), capped at 10.
-   */
-  public increment(): void {
-    if (this.counter < 10) {
-      this.counter += 1
-      this.lastUpdated = new Date()
-    }
-  }
-
-  /**
-   * @summary Decrements counter by 1 ("Needs Review" action), floored at 0.
-   */
-  public decrement(): void {
-    if (this.counter > 0) {
-      this.counter -= 1
-      this.lastUpdated = new Date()
-    }
-  }
-
-  /**
    * @summary Persists progress to the database using upsert to honor the unique constraint (user_id, card_id, direction_id).
    * @returns {Promise<void>} A promise that resolves when the save operation is complete.
    * @throws {Error} If required fields are missing or the database operation fails.

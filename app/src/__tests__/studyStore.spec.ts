@@ -38,6 +38,7 @@ describe('useStudyStore', () => {
     vi.restoreAllMocks()
 
     const profile = new Profile('user-1', createdAt, createdAt)
+    vi.spyOn(profile, 'saveDeckPreference').mockResolvedValue(profile)
     useAuthStore().setAuthenticated(profile, {
       access_token: 'token',
       token_type: 'bearer',
@@ -182,5 +183,20 @@ describe('useStudyStore', () => {
 
     expect(store.sessionPool).toEqual([])
     expect(store.error).toContain('Unable to start studying')
+  })
+
+  it('publishes the engine rating immediately without surfacing a save failure', async () => {
+    const store = useStudyStore()
+    await store.startSession('tag-1', direction)
+    store.startActiveSession()
+    vi.spyOn(CardProgress.prototype, 'save').mockRejectedValue(new Error('network unavailable'))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    store.rateCurrentCard('got-it')
+    await vi.waitFor(() => expect(log).toHaveBeenCalled())
+
+    expect(store.progressRecords[0]?.counter).toBe(1)
+    expect(store.activeSession?.currentCard).toBe(eligibleCard)
+    expect(store.error).toBeNull()
   })
 })

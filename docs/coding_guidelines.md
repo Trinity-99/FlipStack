@@ -57,7 +57,7 @@ These guidelines define how code is written in FlipStack. The structure of the s
 
 - **BottomNavigation** (`src/components/BottomNavigation.vue`): Core bottom navigation for study and card-list screens.
 - **DeckSwitcher** (`src/components/DeckSwitcher.vue`): Displays and switches the active deck in the app header.
-- **FeedbackBanner** (`src/components/FeedbackBanner.vue`): Fixed, animated success/error feedback that stays visible while scrolling.
+- **FeedbackBanner** (`src/components/FeedbackBanner.vue`): uccess/warning/error feedback to use by all views.
 - **TagSelector** (`src/components/TagSelector.vue`): Selects tags available in the active deck.
 
 ## 4 Data Layer

@@ -75,6 +75,8 @@ describe('AppLayout', () => {
     expect(wrapper.find('header').exists()).toBe(true)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Cards content')
+    expect(wrapper.get('main').classes()).toContain('px-4')
+    expect(wrapper.get('main').classes()).toContain('py-5')
     expect(wrapper.classes()).toContain('min-h-dvh')
   })
 
@@ -85,6 +87,8 @@ describe('AppLayout', () => {
     expect(wrapper.find('header').exists()).toBe(false)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Study content')
+    expect(wrapper.get('main').classes()).toContain('p-0')
+    expect(wrapper.get('main').classes()).not.toContain('px-4')
   })
 
   it('disables the shared deck switcher while the card editor is open', async () => {
