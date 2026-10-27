@@ -58,7 +58,7 @@
 
   * Displays a **"Congratulations!"** modal/screen summarizing session stats.
 
-  * Primary CTA: **"Start New Session"** — navigates back to the Learning Session Start view (`/study/start`).
+  * Primary CTA: **"Start New Session"** — navigates back to the Learning Session Start view (`/study/init`).
 
 ### UI Design Mapping
 
@@ -84,7 +84,7 @@
 | **AC-04** | **"Got It" Swipe Up (+1 Score)** | Given a card is active, when the user swipes up past the threshold, then the card score increments by +1, the card animates up with a green feedback tint, and the next card in the pool renders. | 
 | **AC-05** | **"Needs Review" Swipe Down (-1 Score)** | Given a card is active with a score $> 0$, when the user swipes down past the threshold, then the card score decrements by -1 (min 0), the card animates down with a red feedback tint, and the next card renders. | 
 | **AC-06** | **Offline Local Persistence** | Given network connectivity is lost during a study session, when the user swipes cards, then scores continue updating locally without blocking the session flow. | 
-| **AC-07** | **Session Completion Overlay** | Given all cards in the session reach score 10, when the final swipe occurs, then the session ends, displaying the congratulations overlay with a *"Start New Session"* button that routes back to `/study/start`. | 
+| **AC-07** | **Session Completion Overlay** | Given all cards in the session reach score 10, when the final swipe occurs, then the session ends, displaying the congratulations overlay with a *"Start New Session"* button that routes back to `/study/init`. | 
 
 ### Technical Guidance
 
