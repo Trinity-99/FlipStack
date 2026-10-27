@@ -90,19 +90,34 @@ describe('StudyView', () => {
     return { wrapper, router, studyStore }
   }
 
-  it('renders the active card and advances through sides with tap and buttons', async () => {
+  it('advances to the next side on a pointer tap and wraps with the side controls', async () => {
     const { wrapper } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage').element
 
-    expect(wrapper.text()).toContain('question text')
-    expect(wrapper.text()).toContain('Prompt · Question')
-    expect(wrapper.text()).toContain('Side 1 of 2')
+    expect(currentSideAnnouncement(wrapper)).toContain('Side 1 of 2: Prompt, question text')
 
-    await wrapper.get('.study-card').trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Side 2 of 2'))
-    expect(wrapper.text()).toContain('answer text')
+    dispatchPointerEvent(studyStage, 'pointerdown', {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+    })
+    dispatchPointerEvent(studyStage, 'pointerup', {
+      pointerId: 1,
+      isPrimary: true,
+      clientX: 104,
+      clientY: 103,
+    })
+
+    await vi.waitFor(() =>
+      expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text'),
+    )
+
+    await wrapper.get('[aria-label="Next side"]').trigger('click')
+    expect(currentSideAnnouncement(wrapper)).toContain('Side 1 of 2: Prompt, question text')
 
     await wrapper.get('[aria-label="Previous side"]').trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Side 1 of 2'))
+    expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text')
   })
 
   it('shows completion after the last card reaches score ten', async () => {
@@ -115,13 +130,14 @@ describe('StudyView', () => {
       createdAt,
     )
     vi.spyOn(CardProgress.prototype, 'save').mockResolvedValue()
-    const { wrapper, router } = await mountStudyView([masteredSoon])
+    const { wrapper, router, studyStore } = await mountStudyView([masteredSoon])
 
     const gotItButton = wrapper.findAll('button').find((button) => button.text().includes('Got It'))
     if (!gotItButton) throw new Error('Expected the Got It control.')
     await gotItButton.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Congratulations!'))
+    await vi.waitFor(() => expect(studyStore.activeSession?.isSessionComplete).toBe(true))
 
+    expect(studyStore.activeSession?.masteredDuringSession).toBe(1)
     expect(wrapper.text()).toContain('You mastered 1 card on Whole Deck')
     const startButton = wrapper
       .findAll('button')
@@ -132,69 +148,79 @@ describe('StudyView', () => {
   })
 
   it('uses horizontal pointer movement to turn sides', async () => {
-    const { wrapper } = await mountStudyView()
-    const studyCard = wrapper.get('button.study-card').element
+    const { wrapper, studyStore } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage').element
 
-    dispatchPointerEvent(studyCard, 'pointerdown', {
+    dispatchPointerEvent(studyStage, 'pointerdown', {
       pointerId: 1,
       isPrimary: true,
       clientX: 100,
       clientY: 100,
     })
-    dispatchPointerEvent(studyCard, 'pointermove', {
+    dispatchPointerEvent(studyStage, 'pointermove', {
       pointerId: 1,
       isPrimary: true,
-      clientX: 170,
-      clientY: 140,
+      clientX: 160,
+      clientY: 130,
     })
-    dispatchPointerEvent(studyCard, 'pointerup', {
+    dispatchPointerEvent(studyStage, 'pointerup', {
       pointerId: 1,
       isPrimary: true,
-      clientX: 170,
-      clientY: 140,
+      clientX: 160,
+      clientY: 130,
     })
 
-    await vi.waitFor(() => expect(wrapper.text()).toContain('Side 2 of 2'))
+    await vi.waitFor(() =>
+      expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text'),
+    )
+    expect(studyStore.progressRecords).toHaveLength(0)
   })
 
   it('uses a vertical pointer swipe to rate the current card', async () => {
-    const { wrapper } = await mountStudyView()
-    const studyCard = wrapper.get('button.study-card').element
+    const { wrapper, studyStore } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage').element
 
-    dispatchPointerEvent(studyCard, 'pointerdown', {
+    dispatchPointerEvent(studyStage, 'pointerdown', {
       pointerId: 2,
       isPrimary: true,
       clientX: 100,
       clientY: 200,
     })
-    dispatchPointerEvent(studyCard, 'pointermove', {
+    dispatchPointerEvent(studyStage, 'pointermove', {
       pointerId: 2,
       isPrimary: true,
       clientX: 110,
-      clientY: 80,
+      clientY: 100,
     })
-    dispatchPointerEvent(studyCard, 'pointerup', {
+    dispatchPointerEvent(studyStage, 'pointerup', {
       pointerId: 2,
       isPrimary: true,
       clientX: 110,
-      clientY: 80,
+      clientY: 100,
     })
 
-    await vi.waitFor(() => expect(wrapper.text()).toContain('1 / 10'))
+    await vi.waitFor(() => expect(studyStore.progressRecords[0]?.counter).toBe(1))
   })
 
   it('uses a fast vertical flick shorter than the normal swipe threshold to rate the card', async () => {
-    const { wrapper } = await mountStudyView()
-    const studyCard = wrapper.get('button.study-card').element
+    const { wrapper, studyStore } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage').element
 
-    dispatchPointerEvent(studyCard, 'pointerdown', {
+    dispatchPointerEvent(studyStage, 'pointerdown', {
       pointerId: 3,
       isPrimary: true,
       clientX: 100,
       clientY: 200,
       timeStamp: 100,
     })
-    dispatchPointerEvent(studyCard, 'pointerup', {
+    dispatchPointerEvent(studyStage, 'pointermove', {
+      pointerId: 3,
+      isPrimary: true,
+      clientX: 110,
+      clientY: 150,
+      timeStamp: 125,
+    })
+    dispatchPointerEvent(studyStage, 'pointerup', {
       pointerId: 3,
       isPrimary: true,
       clientX: 110,
@@ -202,21 +228,28 @@ describe('StudyView', () => {
       timeStamp: 150,
     })
 
-    await vi.waitFor(() => expect(wrapper.text()).toContain('1 / 10'))
+    await vi.waitFor(() => expect(studyStore.progressRecords[0]?.counter).toBe(1))
   })
 
   it('does not rate a slow vertical gesture shorter than the normal swipe threshold', async () => {
-    const { wrapper } = await mountStudyView()
-    const studyCard = wrapper.get('button.study-card').element
+    const { wrapper, studyStore } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage').element
 
-    dispatchPointerEvent(studyCard, 'pointerdown', {
+    dispatchPointerEvent(studyStage, 'pointerdown', {
       pointerId: 4,
       isPrimary: true,
       clientX: 100,
       clientY: 200,
       timeStamp: 100,
     })
-    dispatchPointerEvent(studyCard, 'pointerup', {
+    dispatchPointerEvent(studyStage, 'pointermove', {
+      pointerId: 4,
+      isPrimary: true,
+      clientX: 110,
+      clientY: 150,
+      timeStamp: 200,
+    })
+    dispatchPointerEvent(studyStage, 'pointerup', {
       pointerId: 4,
       isPrimary: true,
       clientX: 110,
@@ -224,8 +257,8 @@ describe('StudyView', () => {
       timeStamp: 300,
     })
 
-    expect(wrapper.text()).toContain('Card score')
-    expect(wrapper.text()).toContain('0 / 10')
+    expect(studyStore.progressRecords).toHaveLength(0)
+    expect(studyStore.activeSession?.currentCard).toBe(card)
   })
 
   it('returns to session setup when the user exits study', async () => {
@@ -257,4 +290,8 @@ function dispatchPointerEvent(
     Object.defineProperty(event, 'timeStamp', { value: timeStamp })
   }
   target.dispatchEvent(event)
+}
+
+function currentSideAnnouncement(wrapper: ReturnType<typeof mount>): string {
+  return wrapper.find('.sr-only[aria-live="polite"]').text()
 }
