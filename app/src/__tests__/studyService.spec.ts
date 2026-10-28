@@ -66,6 +66,66 @@ describe('StudyService', () => {
     ])
   })
 
+  it('rejects an exact duplicate direction without attempting to save', async () => {
+    const save = vi.spyOn(Direction.prototype, 'save').mockResolvedValue()
+    const existing = new Direction(
+      'saved-direction',
+      'deck-1',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      null,
+    )
+
+    await expect(
+      service.createDirection('deck-1', existing.configuration, [existing]),
+    ).rejects.toThrow('This exact study direction already exists')
+
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('allows different ordering and saves the new direction', async () => {
+    const save = vi.spyOn(Direction.prototype, 'save').mockResolvedValue()
+    const existing = new Direction(
+      'saved-direction',
+      'deck-1',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      null,
+    )
+    const configuration = [
+      { side: 2, role: 'question' as const },
+      { side: 1, role: 'answer' as const },
+    ]
+
+    const created = await service.createDirection('deck-1', configuration, [existing])
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(created.deckId).toBe('deck-1')
+    expect(created.configuration).toEqual(configuration)
+    expect(created.id).toBeNull()
+  })
+
+  it('propagates direction persistence failures', async () => {
+    const saveError = new Error('save failed')
+    vi.spyOn(Direction.prototype, 'save').mockRejectedValue(saveError)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(
+      service.createDirection(
+        'deck-1',
+        [
+          { side: 1, role: 'question' },
+          { side: 2, role: 'answer' },
+        ],
+        [],
+      ),
+    ).rejects.toBe(saveError)
+  })
+
   it('filters by topic and treats missing progress as zero', () => {
     const taggedCard = createCard('tagged', { s1: 'one', s2: 'uno' }, ['tag-1'])
     const otherCard = createCard('other', { s1: 'two', s2: 'dos' }, ['tag-2'])

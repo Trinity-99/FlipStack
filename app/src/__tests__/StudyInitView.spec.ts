@@ -8,6 +8,7 @@ import { Deck } from '@/models/deck'
 import { Direction } from '@/models/direction'
 import { Profile } from '@/models/profile'
 import { Tag } from '@/models/tag'
+import { DirectionAlreadyExistsError } from '@/engine/studyService'
 import StudyInitView from '@/views/StudyInitView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
@@ -47,6 +48,7 @@ describe('StudyInitView', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
+    vi.spyOn(Deck, 'findById').mockResolvedValue(deck)
 
     const preference = {
       deckId: 'deck-1',
@@ -208,6 +210,123 @@ describe('StudyInitView', () => {
 
     expect(reset).not.toHaveBeenCalled()
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('creates, selects, and recalculates for a new direction', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const newDirection = new Direction(
+      'direction-2',
+      'deck-1',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      createdAt,
+    )
+    const deckStore = useDeckStore()
+    const create = vi.spyOn(deckStore, 'createDirection').mockImplementation(async () => {
+      deckStore.upsertDirection(newDirection)
+      return newDirection
+    })
+    const loadPoolSummary = vi.spyOn(useStudyStore(), 'loadPoolSummary').mockResolvedValue()
+
+    await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Study direction"]').element.value).toBe(
+      'direction-1',
+    )
+
+    const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
+    await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
+    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
+    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
+    await flushPromises()
+    await wrapper.get('[role="dialog"] form').trigger('submit')
+    await flushPromises()
+
+    expect(create).toHaveBeenCalledWith([
+      { side: 1, role: 'question' },
+      { side: 2, role: 'answer' },
+    ])
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Study direction"]').element.value).toBe(
+      'direction-2',
+    )
+    expect(wrapper.text()).toContain('Script - Meaning')
+    expect(loadPoolSummary).toHaveBeenCalledWith('tag-1', newDirection)
+  })
+
+  it('keeps the creation modal and previous selection after a save failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountView()
+    await flushPromises()
+
+    const create = vi
+      .spyOn(useDeckStore(), 'createDirection')
+      .mockRejectedValue(new Error('save failed'))
+    const loadPoolSummary = vi
+      .spyOn(useStudyStore(), 'loadPoolSummary')
+      .mockClear()
+      .mockResolvedValue()
+
+    await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
+    const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
+    await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
+    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
+    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
+    await flushPromises()
+    await wrapper.get('[role="dialog"] form').trigger('submit')
+    await flushPromises()
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Unable to save this direction.')
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Study direction"]').element.value).toBe(
+      'direction-1',
+    )
+    expect(loadPoolSummary).not.toHaveBeenCalled()
+  })
+
+  it('explains when a duplicate direction already exists', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountView()
+    await flushPromises()
+
+    vi.spyOn(useDeckStore(), 'createDirection').mockRejectedValue(new DirectionAlreadyExistsError())
+
+    await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
+    const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
+    await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
+    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
+    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
+    await flushPromises()
+    await wrapper.get('[role="dialog"] form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      'This direction already exists for this deck. Choose a different combination of sides or reveal order.',
+    )
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+  })
+
+  it('cancels direction creation without saving or changing selection', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    const create = vi.spyOn(useDeckStore(), 'createDirection')
+
+    await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
+    const cancelButton = wrapper
+      .findAll('[role="dialog"] button')
+      .find((button) => button.text() === 'Cancel')
+    await cancelButton?.trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(create).not.toHaveBeenCalled()
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Study direction"]').element.value).toBe(
+      'direction-1',
+    )
   })
 
   it('navigates to active study only after session preparation succeeds', async () => {

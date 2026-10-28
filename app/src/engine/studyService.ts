@@ -43,6 +43,19 @@ export interface StudySessionState extends StudyPoolState {
 }
 
 /**
+ * @summary Identifies a direction configuration already saved for the active deck.
+ */
+export class DirectionAlreadyExistsError extends Error {
+  /**
+   * @summary Creates an error for an exact duplicate direction configuration.
+   */
+  constructor() {
+    super('This direction already exists.')
+    this.name = 'DirectionAlreadyExistsError'
+  }
+}
+
+/**
  * @summary Coordinates study workflows and contains study eligibility, mastery, and pool rules.
  */
 export class StudyService {
@@ -68,6 +81,41 @@ export class StudyService {
       progressRecords,
       poolSummary: this.getPoolSummary(cards, direction, progressRecords, tagId),
     }
+  }
+
+  /**
+   * @summary Rejects a duplicate direction and persists a new configuration.
+   * @param {string} deckId - The deck that owns the direction.
+   * @param {DirectionStep[]} configuration - The ordered side and role configuration.
+   * @param {Direction[]} existingDirections - Directions already loaded for the deck.
+   * @returns {Promise<Direction>} The newly saved direction.
+   * @throws {Error} If the deck ID is invalid, the configuration is duplicated, or saving fails.
+   */
+  public async createDirection(
+    deckId: string,
+    configuration: DirectionStep[],
+    existingDirections: Direction[],
+  ): Promise<Direction> {
+    if (!deckId || !deckId.trim()) {
+      throw new Error('Cannot create a direction without an active deck ID.')
+    }
+
+    const isDuplicate = existingDirections.some(
+      (existingDirection) =>
+        existingDirection.deckId === deckId &&
+        existingDirection.configuration.length === configuration.length &&
+        existingDirection.configuration.every(
+          (step, index) =>
+            step.side === configuration[index]?.side && step.role === configuration[index]?.role,
+        ),
+    )
+    if (isDuplicate) {
+      throw new DirectionAlreadyExistsError()
+    }
+
+    const direction = new Direction(null, deckId, configuration, null)
+    await direction.save()
+    return direction
   }
 
   /**

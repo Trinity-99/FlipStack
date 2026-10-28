@@ -220,6 +220,66 @@ describe('useDeckStore', () => {
     )
   })
 
+  it('creates a direction and updates the active deck cache after saving', async () => {
+    const store = useDeckStore()
+    store.decks = [userDecks[0]!]
+    store.activeDeckId = 'deck-newer'
+    const save = vi.spyOn(Direction.prototype, 'save').mockImplementation(async function (
+      this: Direction,
+    ): Promise<void> {
+      Object.assign(this, { id: 'direction-new', createdAt })
+    })
+
+    const created = await store.createDirection([
+      { side: 1, role: 'question' },
+      { side: 2, role: 'answer' },
+    ])
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(created.id).toBe('direction-new')
+    expect(store.directions).toEqual([created])
+  })
+
+  it('leaves the direction cache unchanged when creation fails', async () => {
+    const store = useDeckStore()
+    store.decks = [userDecks[0]!]
+    store.activeDeckId = 'deck-newer'
+    const existing = new Direction(
+      'direction-existing',
+      'deck-newer',
+      [
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ],
+      createdAt,
+    )
+    store.directions = [existing]
+    const save = vi.spyOn(Direction.prototype, 'save')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(
+      store.createDirection([
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ]),
+    ).rejects.toThrow('This exact study direction already exists')
+
+    expect(save).not.toHaveBeenCalled()
+    expect(store.directions).toEqual([existing])
+    expect(log).toHaveBeenCalledOnce()
+  })
+
+  it('requires an active deck before creating a direction', async () => {
+    const store = useDeckStore()
+
+    await expect(
+      store.createDirection([
+        { side: 1, role: 'question' },
+        { side: 2, role: 'answer' },
+      ]),
+    ).rejects.toThrow('loaded active deck')
+  })
+
   it('retries initialization after deck data fails to load', async () => {
     const profile = new Profile('user-1', createdAt, createdAt, 'deck-newer')
     useAuthStore().setAuthenticated(profile, {

@@ -2,9 +2,10 @@ import { computed, shallowRef, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { Card } from '@/models/card'
 import { Deck } from '@/models/deck'
-import { Direction } from '@/models/direction'
+import { Direction, type DirectionStep } from '@/models/direction'
 import { Profile } from '@/models/profile'
 import { Tag } from '@/models/tag'
+import { StudyService } from '@/engine/studyService'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
 
@@ -20,6 +21,7 @@ interface ActiveDeckData {
 export const useDeckStore = defineStore('decks', () => {
   const authStore = useAuthStore()
   const cardStore = useCardStore()
+  const studyService = new StudyService()
   const decks = shallowRef<Deck[]>([])
   const activeDeckId = ref<string | null>(null)
   const directions = shallowRef<Direction[]>([])
@@ -174,6 +176,28 @@ export const useDeckStore = defineStore('decks', () => {
   }
 
   /**
+   * @summary Creates a direction for the active deck and synchronizes its cache.
+   * @param {DirectionStep[]} configuration - The ordered side and role configuration.
+   * @returns {Promise<Direction>} The newly saved direction.
+   * @throws {Error} If no active deck exists, the configuration is duplicated, or saving fails.
+   */
+  async function createDirection(configuration: DirectionStep[]): Promise<Direction> {
+    const deckId = activeDeckId.value
+    if (!deckId || !activeDeck.value || activeDeck.value.id !== deckId) {
+      throw new Error('Cannot create a direction without a loaded active deck.')
+    }
+
+    try {
+      const direction = await studyService.createDirection(deckId, configuration, directions.value)
+      upsertDirection(direction)
+      return direction
+    } catch (createError: unknown) {
+      console.error(`DeckStore.createDirection failed for deck ${deckId}:`, createError)
+      throw createError
+    }
+  }
+
+  /**
    * @summary Switches the active deck after its data and saved preference load successfully.
    * @param {string} deckId - The UUID of the deck to activate.
    * @returns {Promise<void>} A promise that resolves when the deck is active.
@@ -245,6 +269,7 @@ export const useDeckStore = defineStore('decks', () => {
     loadActiveDeckData,
     upsertDeck,
     upsertDirection,
+    createDirection,
     retryLoad,
   }
 })

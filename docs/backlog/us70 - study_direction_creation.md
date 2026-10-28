@@ -11,7 +11,7 @@
 ### Detailed Feature & UX Behavior
 
 * **Context & Trigger Point:**
-  * Accessed directly from the Direction Selector dropdown on the **Session Start View** (`/study/start` or `/session/start`).
+  * Accessed directly from the Direction Selector dropdown on the **Session Start View** (`/study/init`).
   * Selecting **"+ Create New Direction"** opens a lightweight modal dialogue over the current view.
 
 * **Modal Dialogue Inputs (Using Deck Side Labels):**
@@ -22,8 +22,8 @@
 
 * **Automated Direction Name Generation:**
   * The user does not enter a manual name.
-  * The `StudyDirection` model automatically derives a human-readable direction title using the selected deck side labels:
-    * *Example Syntax:* `[Question Label] -> [Answer Label(s)]` (e.g., *"Script -> Meaning"* or *"Script -> Phonetic + Meaning"*).
+  * The `Direction` model automatically derives a human-readable direction title using the selected deck side labels:
+    * *Example Syntax:* `[Question Label] - [Answer Label] - [Answer or Question Label]` (e.g., *"Script - Meaning"* or *"Script - Phonetic - Meaning"*).
 
 * **Validation Rules:**
   * The selected Question side cannot simultaneously be selected as an Answer side.
@@ -31,7 +31,7 @@
   * Duplicate direction mappings for the same deck are prevented or highlighted.
 
 * **Save & Auto-Selection Workflow:**
-  * Tapping **"Save Direction"** persists the new direction via the `StudyDirection` model linked to the active `deckId`.
+  * Tapping **"Save Direction"** persists the new direction via the `Direction` model linked to the active `deckId`.
   * Closes the dialogue immediately, automatically selects the newly created direction in the Session Start selector, and triggers an immediate recalculation of the live eligible card pool.
 
 ### UI Design Mapping
@@ -46,13 +46,13 @@
 | ID | Test Scenario | Expected Outcome |
 | --- | --- | --- |
 | **AC-01** | **Modal Rendering with Deck Labels** | Given a user opens the direction creation modal for a deck, then side selector options display the deck's configured labels (e.g., *"Script"*, *"Phonetic"*, *"Meaning"*) rather than generic side numbers. |
-| **AC-02** | **Automated Direction Naming** | Given a user selects *"Script"* as Question and *"Meaning"* as Answer, then the model automatically generates the name `"Script -> Meaning"`. |
+| **AC-02** | **Automated Direction Naming** | Given a user selects *"Script"* as Question and *"Meaning"* as Answer, then the model automatically generates the name `"Script - Meaning"`. |
 | **AC-03** | **Validation Guard against Overlapping Roles** | Given a user attempts to select the *"Script"* label as both Question and Answer, when submitting, then an inline error message prevents save until side roles are distinct. |
 | **AC-04** | **Instant Selection & Pool Recalculation** | Given a new direction is saved, then the modal closes, the auto-named direction is automatically selected on the Session Start view, and the eligible card pool recalculates instantly. |
 
 ### Technical Guidance
 
 * **Architectural Placement:**
-  * **Component:** `app/src/components/study/StudyDirectionCreateModal.vue` (rendered conditionally within `StudyStartView.vue`).
-  * **Model:** `StudyDirection.ts` handling name generation logic (`generateTitle()`), validation rules, and Supabase persistence.
+  * **Component:** `app/src/components/DirectionDefinition.vue` (rendered conditionally within `StudyInitView.vue`).
+  * **Model:** `Direction.ts` handling name generation logic (`generateTitle()`), validation rules, and Supabase persistence.
   * **Store:** Updates `deckStore.ts` / `studyStore.ts` to append the new direction and set it active in memory.
