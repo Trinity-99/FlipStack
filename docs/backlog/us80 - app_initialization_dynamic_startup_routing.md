@@ -46,7 +46,7 @@
 
      * **0 Cards in Active Deck:** Routes directly to `/cards/new` (Card Onboarding for active deck).
 
-     * **1+ Cards in Active Deck:** Routes directly to `/study/start` (Main Learning Launchpad).
+     * **1+ Cards in Active Deck:** Routes directly to `/study/init` (Main Learning Launchpad).
 
 ### UI Design Mapping
 

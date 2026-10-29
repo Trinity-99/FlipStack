@@ -117,7 +117,7 @@ describe('AppLayout', () => {
     expect(wrapper.findAll('button').some((button) => button.text() === 'Try again')).toBe(true)
   })
 
-  it('initializes deck data when an authenticated profile exists', async () => {
+  it('does not initialize deck data outside the router guard', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     useAuthStore(pinia).setAuthenticated(new Profile('user-1', new Date(), new Date()), {
@@ -134,8 +134,12 @@ describe('AppLayout', () => {
       },
     })
     const findAllForUser = vi.spyOn(Deck, 'findAllForUser').mockResolvedValue([])
+    const initialize = vi.spyOn(useDeckStore(pinia), 'initialize')
 
     mount(AppLayout, { global: { plugins: [pinia, layoutRouter] } })
-    await vi.waitFor(() => expect(findAllForUser).toHaveBeenCalledWith('user-1'))
+    await flushPromises()
+
+    expect(findAllForUser).not.toHaveBeenCalled()
+    expect(initialize).not.toHaveBeenCalled()
   })
 })

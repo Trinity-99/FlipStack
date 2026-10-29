@@ -1,18 +1,49 @@
-import { describe, it, expect } from 'vitest'
-import { createPinia } from 'pinia'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { flushPromises, mount } from '@vue/test-utils'
 import App from '../App.vue'
 import router from '@/router'
+import { Profile } from '@/models/profile'
+import { useAuthStore } from '@/stores/authStore'
 
 describe('App', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders the login view at the root route', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    vi.spyOn(Profile, 'restoreAuthentication').mockResolvedValue(null)
     await router.push('/')
     await router.isReady()
 
-    const wrapper = mount(App, { global: { plugins: [createPinia(), router] } })
-    await wrapper.vm.$nextTick()
+    const wrapper = mount(App, { global: { plugins: [pinia, router] } })
+    await flushPromises()
 
     expect(wrapper.text()).toContain('Welcome back')
+  })
+
+  it('shows the startup indicator until auth and initial navigation are ready', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    vi.spyOn(Profile, 'restoreAuthentication').mockResolvedValue(null)
+    await router.push('/')
+    await router.isReady()
+
+    const authStore = useAuthStore(pinia)
+    authStore.isRestoring = true
+    const wrapper = mount(App, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').attributes('aria-label')).toBe('Loading app')
+    expect(wrapper.get('[role="status"] svg').classes()).toContain('text-indigo-500')
+
+    authStore.isRestoring = false
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Welcome back')
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
   })
 
   it('resolves navigation routes inside the app layout', () => {

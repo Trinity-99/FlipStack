@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { AuthenticationError, Profile } from '@/models/profile'
+import type { AuthenticationResult } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -9,11 +11,11 @@ const NETWORK_ERROR_MESSAGE =
   'Unable to connect to the server. Please check your internet connection and try again.'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const email = ref('')
 const password = ref('')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
 
 /**
  * @summary Validates the login form before a network request is made.
@@ -40,7 +42,6 @@ async function handleSubmit(): Promise<void> {
   if (isSubmitting.value) return
 
   errorMessage.value = ''
-  successMessage.value = ''
 
   const validationError = validateForm()
   if (validationError) {
@@ -50,23 +51,33 @@ async function handleSubmit(): Promise<void> {
 
   isSubmitting.value = true
   try {
-    const result = await Profile.authenticate(email.value.trim(), password.value)
-    authStore.setAuthenticated(result.profile, result.session)
-    successMessage.value = 'Login successful!'
-  } catch (error: unknown) {
-    if (error instanceof AuthenticationError) {
-      if (error.kind === 'invalid-credentials') {
-        errorMessage.value = INVALID_CREDENTIALS_MESSAGE
-        return
+    let result: AuthenticationResult
+    try {
+      result = await Profile.authenticate(email.value.trim(), password.value)
+    } catch (error: unknown) {
+      if (error instanceof AuthenticationError) {
+        if (error.kind === 'invalid-credentials') {
+          errorMessage.value = INVALID_CREDENTIALS_MESSAGE
+          return
+        }
+        if (error.kind === 'network') {
+          errorMessage.value = NETWORK_ERROR_MESSAGE
+          return
+        }
       }
-      if (error.kind === 'network') {
-        errorMessage.value = NETWORK_ERROR_MESSAGE
-        return
-      }
+
+      console.error('Login submission failed:', error)
+      errorMessage.value = 'Unable to sign in. Please try again.'
+      return
     }
 
-    console.error('Login submission failed:', error)
-    errorMessage.value = 'Unable to sign in. Please try again.'
+    authStore.setAuthenticated(result.profile, result.session)
+    try {
+      await router.replace({ name: 'SessionStart' })
+    } catch (error: unknown) {
+      console.error('Login succeeded, but app navigation failed:', error)
+      errorMessage.value = 'You are signed in, but the app could not be opened. Please try again.'
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -94,15 +105,6 @@ async function handleSubmit(): Promise<void> {
         aria-live="assertive"
       >
         {{ errorMessage || authStore.initializationError }}
-      </div>
-
-      <div
-        v-if="successMessage"
-        class="mb-6 rounded-xl border border-accent-got-it/50 bg-accent-got-it/10 px-4 py-3 text-sm text-accent-got-it"
-        role="status"
-        aria-live="polite"
-      >
-        {{ successMessage }}
       </div>
 
       <form novalidate class="space-y-5" @submit.prevent="handleSubmit">

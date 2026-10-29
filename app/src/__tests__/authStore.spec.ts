@@ -38,6 +38,7 @@ describe('useAuthStore', () => {
     expect(store.profile).toBe(profile)
     expect(store.session).toBe(session)
     expect(store.isAuthenticated).toBe(true)
+    expect(store.hasRestoredAuthentication).toBe(true)
   })
 
   it('replaces the profile without clearing the session', () => {
@@ -66,6 +67,8 @@ describe('useAuthStore', () => {
     expect(store.profile).toBe(restoredProfile)
     expect(store.session).toBe(session)
     expect(store.isAuthenticated).toBe(true)
+    expect(store.isRestoring).toBe(false)
+    expect(store.hasRestoredAuthentication).toBe(true)
   })
 
   it('keeps the store unauthenticated when no persisted session exists', async () => {
@@ -77,5 +80,46 @@ describe('useAuthStore', () => {
     expect(store.profile).toBeNull()
     expect(store.session).toBeNull()
     expect(store.isAuthenticated).toBe(false)
+    expect(store.isRestoring).toBe(false)
+    expect(store.hasRestoredAuthentication).toBe(true)
+  })
+
+  it('coalesces concurrent restoration requests', async () => {
+    let resolveRestoration: ((result: null) => void) | undefined
+    const restoreAuthentication = vi.spyOn(Profile, 'restoreAuthentication').mockReturnValue(
+      new Promise((resolve) => {
+        resolveRestoration = resolve
+      }),
+    )
+    const store = useAuthStore()
+
+    const firstRestoration = store.restoreAuthentication()
+    const secondRestoration = store.restoreAuthentication()
+
+    expect(store.isRestoring).toBe(true)
+    expect(restoreAuthentication).toHaveBeenCalledTimes(1)
+
+    resolveRestoration?.(null)
+    await Promise.all([firstRestoration, secondRestoration])
+
+    expect(store.isRestoring).toBe(false)
+    expect(store.hasRestoredAuthentication).toBe(true)
+  })
+
+  it('records restore failures and does not retry the completed initial attempt', async () => {
+    const restoreAuthentication = vi
+      .spyOn(Profile, 'restoreAuthentication')
+      .mockRejectedValue(new Error('Restore failed'))
+    const store = useAuthStore()
+
+    await expect(store.restoreAuthentication()).rejects.toThrow('Restore failed')
+
+    expect(store.initializationError).toBe('Unable to restore your session. Please sign in again.')
+    expect(store.isRestoring).toBe(false)
+    expect(store.hasRestoredAuthentication).toBe(true)
+
+    await store.restoreAuthentication()
+
+    expect(restoreAuthentication).toHaveBeenCalledTimes(1)
   })
 })

@@ -7,6 +7,16 @@ import type { AuthenticationResult } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
 import LoginView from '@/views/LoginView.vue'
 
+const { replaceRoute } = vi.hoisted(() => ({ replaceRoute: vi.fn<() => Promise<void>>() }))
+
+vi.mock('vue-router', async (importOriginal) => {
+  const routerModule = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...routerModule,
+    useRouter: () => ({ replace: replaceRoute }),
+  }
+})
+
 const session: Session = {
   access_token: 'access-token',
   token_type: 'bearer',
@@ -31,6 +41,7 @@ describe('LoginView', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    replaceRoute.mockReset()
   })
 
   function mountLoginView() {
@@ -70,7 +81,7 @@ describe('LoginView', () => {
     expect(authenticate).not.toHaveBeenCalled()
   })
 
-  it('stores the authenticated user and displays the success message', async () => {
+  it('stores the authenticated user and navigates to the guarded startup route', async () => {
     const authenticate = vi.spyOn(Profile, 'authenticate').mockResolvedValue(authenticationResult)
     const wrapper = mountLoginView()
     const store = useAuthStore()
@@ -82,7 +93,24 @@ describe('LoginView', () => {
     expect(store.profile).toBe(profile)
     expect(store.session).toBe(session)
     expect(store.isAuthenticated).toBe(true)
-    expect(wrapper.get('[role="status"]').text()).toBe('Login successful!')
+    expect(replaceRoute).toHaveBeenCalledWith({ name: 'SessionStart' })
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+
+  it('surfaces a navigation failure after successful authentication', async () => {
+    vi.spyOn(Profile, 'authenticate').mockResolvedValue(authenticationResult)
+    replaceRoute.mockRejectedValue(new Error('Navigation failed'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const wrapper = mountLoginView()
+    await fillValidCredentials(wrapper)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(useAuthStore().isAuthenticated).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      'You are signed in, but the app could not be opened.',
+    )
+    expect(consoleError).toHaveBeenCalled()
   })
 
   it('shows the invalid-credentials message', async () => {

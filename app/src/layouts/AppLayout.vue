@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import BottomNavigation from '@/components/BottomNavigation.vue'
 import DeckSwitcher from '@/components/DeckSwitcher.vue'
@@ -14,17 +14,6 @@ const isImmersive = computed(() => route.meta.immersive === true)
 const isDeckSwitcherDisabled = computed(() => route.meta.deckSwitcherDisabled === true)
 const isBottomNavigationHidden = computed(() => route.meta.hideBottomNavigation === true)
 
-async function initializeDecks(): Promise<void> {
-  const profile = authStore.profile
-  if (!profile) return
-
-  try {
-    await deckStore.initialize(profile)
-  } catch {
-    // The deck store exposes the failure in its error state, rendered below.
-  }
-}
-
 async function retryDeckLoading(): Promise<void> {
   try {
     await deckStore.retryLoad()
@@ -32,8 +21,6 @@ async function retryDeckLoading(): Promise<void> {
     // The deck store exposes retry failures in the error state, rendered below.
   }
 }
-
-watch(() => authStore.profile, initializeDecks, { immediate: true })
 </script>
 
 <template>

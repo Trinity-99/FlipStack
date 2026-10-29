@@ -11,23 +11,39 @@ export const useAuthStore = defineStore('auth', () => {
   const session = shallowRef<Session | null>(null)
   const initializationError = shallowRef<string | null>(null)
   const isAuthenticated = computed(() => profile.value !== null && session.value !== null)
+  const isRestoring = shallowRef(false)
+  const hasRestoredAuthentication = shallowRef(false)
+  let restorationPromise: Promise<void> | null = null
 
   /**
    * @summary Restores authentication from the persisted Supabase session on app startup.
    * @returns {Promise<void>} A promise that resolves when authentication restoration completes.
    * @throws {Error} If a persisted session or its profile cannot be restored.
    */
-  async function restoreAuthentication(): Promise<void> {
+  function restoreAuthentication(): Promise<void> {
+    if (hasRestoredAuthentication.value) return Promise.resolve()
+    if (restorationPromise) return restorationPromise
+
+    isRestoring.value = true
     initializationError.value = null
-    try {
-      const authentication = await Profile.restoreAuthentication()
-      if (authentication) {
-        setAuthenticated(authentication.profile, authentication.session)
+
+    const pendingRestoration = (async (): Promise<void> => {
+      try {
+        const authentication = await Profile.restoreAuthentication()
+        if (authentication) {
+          setAuthenticated(authentication.profile, authentication.session)
+        }
+      } catch (error: unknown) {
+        initializationError.value = 'Unable to restore your session. Please sign in again.'
+        throw error
+      } finally {
+        hasRestoredAuthentication.value = true
+        isRestoring.value = false
+        restorationPromise = null
       }
-    } catch (error: unknown) {
-      initializationError.value = 'Unable to restore your session. Please sign in again.'
-      throw error
-    }
+    })()
+    restorationPromise = pendingRestoration
+    return pendingRestoration
   }
 
   /**
@@ -40,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = authenticatedProfile
     session.value = authenticatedSession
     initializationError.value = null
+    hasRestoredAuthentication.value = true
   }
 
   /**
@@ -56,6 +73,8 @@ export const useAuthStore = defineStore('auth', () => {
     session,
     initializationError,
     isAuthenticated,
+    isRestoring,
+    hasRestoredAuthentication,
     restoreAuthentication,
     setAuthenticated,
     setProfile,
