@@ -80,7 +80,7 @@ describe('StudyService', () => {
 
     await expect(
       service.createDirection('deck-1', existing.configuration, [existing]),
-    ).rejects.toThrow('This exact study direction already exists')
+    ).rejects.toThrow('This direction already exists.')
 
     expect(save).not.toHaveBeenCalled()
   })

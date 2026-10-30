@@ -176,6 +176,69 @@ export const useDeckStore = defineStore('decks', () => {
   }
 
   /**
+   * @summary Adds or replaces a saved tag in the active deck cache.
+   * @param {Tag} tag - The persisted tag to synchronize with the cache.
+   * @returns {void}
+   * @throws {Error} If the tag is unsaved or does not belong to the active deck.
+   */
+  function upsertTag(tag: Tag): void {
+    if (!tag.id) {
+      throw new Error('Cannot add a tag to the cache before it has been saved.')
+    }
+    if (!activeDeckId.value || tag.deckId !== activeDeckId.value) {
+      throw new Error('Cannot add a tag that does not belong to the active deck.')
+    }
+
+    const existingIndex = tags.value.findIndex((cachedTag) => cachedTag.id === tag.id)
+    if (existingIndex === -1) {
+      tags.value = [...tags.value, tag].sort((first, second) =>
+        first.name.localeCompare(second.name),
+      )
+      return
+    }
+
+    tags.value = tags.value
+      .map((cachedTag, index) => (index === existingIndex ? tag : cachedTag))
+      .sort((first, second) => first.name.localeCompare(second.name))
+  }
+
+  /**
+   * @summary Saves a tag for the active deck and synchronizes its cache.
+   * @param {string} name - The new tag name.
+   * @returns {Promise<Tag>} The saved tag, or an exact-name tag that already exists.
+   * @throws {Error} If there is no active deck, the name is invalid, or saving fails.
+   */
+  async function createTag(name: string): Promise<Tag> {
+    const deckId = activeDeckId.value
+    if (!deckId || activeDeck.value?.id !== deckId) {
+      throw new Error('Cannot create a tag without a loaded active deck.')
+    }
+
+    const normalizedName = name.trim()
+    if (!normalizedName) {
+      throw new Error('Tag name cannot be empty.')
+    }
+
+    const existingTag = tags.value.find((tag) => tag.name === normalizedName)
+    if (existingTag) return existingTag
+
+    try {
+      const tag = new Tag(null, deckId, normalizedName, null)
+      await tag.save()
+
+      if (activeDeckId.value !== deckId) {
+        throw new Error('The active deck changed while the tag was being created.')
+      }
+
+      upsertTag(tag)
+      return tag
+    } catch (createError: unknown) {
+      console.error(`DeckStore.createTag failed for deck ${deckId}:`, createError)
+      throw createError
+    }
+  }
+
+  /**
    * @summary Creates a direction for the active deck and synchronizes its cache.
    * @param {DirectionStep[]} configuration - The ordered side and role configuration.
    * @returns {Promise<Direction>} The newly saved direction.
@@ -269,6 +332,8 @@ export const useDeckStore = defineStore('decks', () => {
     loadActiveDeckData,
     upsertDeck,
     upsertDirection,
+    upsertTag,
+    createTag,
     createDirection,
     retryLoad,
   }

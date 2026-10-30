@@ -220,6 +220,119 @@ describe('useDeckStore', () => {
     )
   })
 
+  it('creates a tag for the active deck and keeps the cache alphabetized', async () => {
+    const store = useDeckStore()
+    store.decks = userDecks
+    store.activeDeckId = 'deck-newer'
+    store.tags = [new Tag('tag-existing', 'deck-newer', 'Vocabulary', createdAt)]
+    const save = vi.spyOn(Tag.prototype, 'save').mockImplementation(async function (
+      this: Tag,
+    ): Promise<void> {
+      Object.assign(this, { id: 'tag-created', createdAt })
+    })
+
+    const created = await store.createTag('  Grammar  ')
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(created.name).toBe('Grammar')
+    expect(created.deckId).toBe('deck-newer')
+    expect(created.id).toBe('tag-created')
+    expect(store.tags.map((tag) => tag.name)).toEqual(['Grammar', 'Vocabulary'])
+  })
+
+  it('returns an existing exact-name tag without inserting a duplicate', async () => {
+    const store = useDeckStore()
+    store.decks = userDecks
+    store.activeDeckId = 'deck-newer'
+    const existingTag = new Tag('tag-existing', 'deck-newer', 'Grammar', createdAt)
+    store.tags = [existingTag]
+    const save = vi.spyOn(Tag.prototype, 'save')
+
+    await expect(store.createTag(' Grammar ')).resolves.toBe(existingTag)
+
+    expect(save).not.toHaveBeenCalled()
+    expect(store.tags).toEqual([existingTag])
+  })
+
+  it('replaces a cached tag with the same ID', () => {
+    const store = useDeckStore()
+    store.activeDeckId = 'deck-newer'
+    const existingTag = new Tag('tag-1', 'deck-newer', 'Old name', createdAt)
+    const updatedTag = new Tag('tag-1', 'deck-newer', 'New name', createdAt)
+    store.tags = [existingTag]
+
+    store.upsertTag(updatedTag)
+
+    expect(store.tags).toEqual([updatedTag])
+  })
+
+  it('rejects tag creation without an active deck or a non-empty name', async () => {
+    const store = useDeckStore()
+
+    await expect(store.createTag('Grammar')).rejects.toThrow('loaded active deck')
+
+    store.decks = userDecks
+    store.activeDeckId = 'deck-newer'
+    await expect(store.createTag('  ')).rejects.toThrow('Tag name cannot be empty.')
+  })
+
+  it('rejects unsaved and non-active-deck tags from the cache', () => {
+    const store = useDeckStore()
+    store.activeDeckId = 'deck-newer'
+    const unsavedTag = new Tag(null, 'deck-newer', 'Grammar', null)
+    const otherDeckTag = new Tag('tag-other', 'deck-older', 'Grammar', createdAt)
+
+    expect(() => store.upsertTag(unsavedTag)).toThrow(
+      'Cannot add a tag to the cache before it has been saved.',
+    )
+    expect(() => store.upsertTag(otherDeckTag)).toThrow(
+      'does not belong to the active deck',
+    )
+  })
+
+  it('leaves the tag cache unchanged and rethrows when persistence fails', async () => {
+    const store = useDeckStore()
+    store.decks = userDecks
+    store.activeDeckId = 'deck-newer'
+    const existingTag = new Tag('tag-existing', 'deck-newer', 'Vocabulary', createdAt)
+    store.tags = [existingTag]
+    vi.spyOn(Tag.prototype, 'save').mockRejectedValue(new Error('Database unavailable'))
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(store.createTag('Grammar')).rejects.toThrow('Database unavailable')
+
+    expect(store.tags).toEqual([existingTag])
+    expect(log).toHaveBeenCalledOnce()
+  })
+
+  it('does not add a created tag to the cache after the active deck changes', async () => {
+    const store = useDeckStore()
+    store.decks = userDecks
+    store.activeDeckId = 'deck-newer'
+    const otherDeckTag = new Tag('tag-older', 'deck-older', 'Older tag', createdAt)
+    let resolveSaving: (value: void | PromiseLike<void>) => void = () => {}
+    const saving = new Promise<void>((resolve) => {
+      resolveSaving = resolve
+    })
+    vi.spyOn(Tag.prototype, 'save').mockImplementation(async function (
+      this: Tag,
+    ): Promise<void> {
+      await saving
+      Object.assign(this, { id: 'tag-created', createdAt })
+    })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const creation = store.createTag('Grammar')
+    store.activeDeckId = 'deck-older'
+    store.tags = [otherDeckTag]
+    resolveSaving()
+
+    await expect(creation).rejects.toThrow('active deck changed')
+
+    expect(store.tags).toEqual([otherDeckTag])
+    expect(log).toHaveBeenCalledOnce()
+  })
+
   it('creates a direction and updates the active deck cache after saving', async () => {
     const store = useDeckStore()
     store.decks = [userDecks[0]!]
@@ -262,7 +375,7 @@ describe('useDeckStore', () => {
         { side: 1, role: 'question' },
         { side: 2, role: 'answer' },
       ]),
-    ).rejects.toThrow('This exact study direction already exists')
+    ).rejects.toThrow('This direction already exists')
 
     expect(save).not.toHaveBeenCalled()
     expect(store.directions).toEqual([existing])

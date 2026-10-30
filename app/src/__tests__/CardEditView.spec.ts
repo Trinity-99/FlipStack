@@ -68,6 +68,7 @@ describe('CardEditView', () => {
     expect(
       wrapper.findAll('textarea').map((textarea) => textarea.attributes('aria-label')),
     ).toEqual(['Script', 'Phonetic', 'Meaning'])
+    await wrapper.get('[aria-label="Expand tag selector"]').trigger('click')
     expect(wrapper.text()).toContain('Grammar')
     expect(wrapper.text()).not.toContain('Thai')
     expect(wrapper.get('form').classes()).toContain('p-4')
@@ -98,6 +99,44 @@ describe('CardEditView', () => {
     ).toEqual(['Front', 'Back'])
   })
 
+  it('creates a tag through the deck store and selects it for the current card', async () => {
+    const deckStore = useDeckStore()
+    const createdTag = new Tag('tag-2', 'deck-1', 'Nouns', createdAt)
+    const createTag = vi.spyOn(deckStore, 'createTag').mockImplementation(async (name) => {
+      expect(name).toBe('Nouns')
+      deckStore.tags = [...deckStore.tags, createdTag]
+      return createdTag
+    })
+    const wrapper = mountView()
+
+    await wrapper.get('[aria-label="Create tag"]').trigger('click')
+    await wrapper.get('#new-tag-name').setValue('Nouns')
+    await wrapper.get('[aria-label="Add tag"]').trigger('click')
+    await flushPromises()
+
+    expect(createTag).toHaveBeenCalledWith('Nouns')
+    expect(wrapper.find('[aria-label="Deselect Nouns"]').exists()).toBe(true)
+    expect(wrapper.get('#tag-options button[aria-pressed="true"]').text()).toBe('Nouns')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('shows tag creation errors and does not select a tag when creation fails', async () => {
+    vi.spyOn(useDeckStore(), 'createTag').mockRejectedValue(new Error('Database unavailable'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountView()
+
+    await wrapper.get('[aria-label="Create tag"]').trigger('click')
+    await wrapper.get('#new-tag-name').setValue('Nouns')
+    await wrapper.get('[aria-label="Add tag"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'Unable to create tag. Please try again.',
+    )
+    expect(wrapper.find('#tag-options button[aria-pressed="true"]').exists()).toBe(false)
+    expect(wrapper.get('#new-tag-name').element).toHaveProperty('value', 'Nouns')
+  })
+
   it('does not cover the shell deck-retry banner with a redundant missing-deck error', async () => {
     const deckStore = useDeckStore()
     deckStore.decks = []
@@ -117,6 +156,7 @@ describe('CardEditView', () => {
     await flushPromises()
 
     await wrapper.get('#card-side-1').setValue('  Thai word  ')
+    await wrapper.get('[aria-label="Expand tag selector"]').trigger('click')
     await wrapper.get('button[aria-pressed="false"]').trigger('click')
     await clickButton(wrapper, 'Save & Create Next')
     await flushPromises()

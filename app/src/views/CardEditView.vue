@@ -40,6 +40,7 @@ const selectedTagIds = ref<string[]>([])
 const loadedCard = shallowRef<Card | null>(null)
 const isLoadingCard = ref(false)
 const isSaving = ref(false)
+const isCreatingTag = ref(false)
 const feedback = useFeedback()
 const { message: feedbackMessage, variant: feedbackVariant } = feedback
 const firstSideInput = ref<HTMLTextAreaElement | null>(null)
@@ -48,6 +49,7 @@ const isFormDisabled = computed(
     deckStore.isLoading ||
     isLoadingCard.value ||
     isSaving.value ||
+    isCreatingTag.value ||
     !authStore.profile ||
     !activeDeck.value ||
     (isEditMode.value && !loadedCard.value),
@@ -109,6 +111,33 @@ function handleSideBeforeInput(event: InputEvent): void {
  */
 function clearValidationError(): void {
   feedback.clearOnEdit()
+}
+
+/**
+ * @summary Creates or reuses a tag for the active deck and selects it for this card.
+ * @param {string} name - The requested tag name.
+ * @returns {Promise<void>}
+ */
+async function createTag(name: string): Promise<void> {
+  if (isCreatingTag.value) return
+
+  isCreatingTag.value = true
+  try {
+    const tag = await deckStore.createTag(name)
+    if (!tag.id) {
+      throw new Error('The saved tag does not have a database ID.')
+    }
+
+    if (!selectedTagIds.value.includes(tag.id)) {
+      selectedTagIds.value = [...selectedTagIds.value, tag.id]
+    }
+    clearValidationError()
+  } catch (error: unknown) {
+    console.error('CardEditView could not create a tag:', error)
+    feedback.showError('Unable to create tag. Please try again.')
+  } finally {
+    isCreatingTag.value = false
+  }
 }
 
 function contentForDeck(source: CardContent, sideCount: number): CardContent {
@@ -341,6 +370,8 @@ watch(
           <TagSelector
             v-model="selectedTagIds"
             :tags="deckStore.tags"
+            :is-creating="isCreatingTag"
+            @create-tag="createTag"
             @update:model-value="clearValidationError"
           />
         </fieldset>
