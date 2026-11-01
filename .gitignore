@@ -150,3 +150,8 @@ vite.config.ts.timestamp-*
 .turbo
 
 DataSet*
+docs/*.png
+docs/*.svg
+docs/*.jpg
+docs/*.jpeg
+docs/or this/*
