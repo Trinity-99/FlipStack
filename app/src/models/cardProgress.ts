@@ -1,4 +1,4 @@
-import { supabase } from '@/db/supabase'
+import { dataRouter } from '@/data/dataRouter'
 import { errorMessage, isDatabaseRecord, requiredDate, requiredString } from '@/models/modelUtils'
 
 /**
@@ -44,31 +44,19 @@ export class CardProgress {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('card_progress')
-        .upsert(
-          {
-            user_id: this.userId,
-            card_id: this.cardId,
-            direction_id: this.directionId,
-            counter: this.counter,
-            last_updated: this.lastUpdated.toISOString(),
-          },
-          { onConflict: 'user_id,card_id,direction_id' },
-        )
-        .select()
-        .single()
-
-      if (error || !data) {
-        throw new Error(
-          `Database error while saving card progress: ${error?.message || 'No data returned'}`,
-        )
-      }
+      const saved = await dataRouter.saveProgress({
+        id: this.id ?? '',
+        user_id: this.userId,
+        card_id: this.cardId,
+        direction_id: this.directionId,
+        counter: this.counter,
+        last_updated: this.lastUpdated.toISOString(),
+      })
 
       Object.assign(this, {
-        id: data.id,
-        counter: data.counter,
-        lastUpdated: new Date(data.last_updated),
+        id: saved.id,
+        counter: saved.counter,
+        lastUpdated: new Date(saved.last_updated),
       })
     } catch (error: unknown) {
       console.error('CardProgress.save failed:', error)
@@ -87,11 +75,7 @@ export class CardProgress {
     }
 
     try {
-      const { error } = await supabase.from('card_progress').delete().eq('id', this.id)
-
-      if (error) {
-        throw new Error(`Database error while deleting card progress: ${error.message}`)
-      }
+      await dataRouter.deleteProgress(this.id)
     } catch (error: unknown) {
       console.error(`CardProgress.delete failed for ID ${this.id}:`, error)
       throw error
@@ -116,19 +100,11 @@ export class CardProgress {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('card_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('card_id', cardId)
-        .eq('direction_id', directionId)
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding card progress: ${error.message}`)
-      }
-
+      const data = await dataRouter.findProgressForUserCardAndDirection(
+        userId,
+        cardId,
+        directionId,
+      )
       return data ? CardProgress.fromJSON(data) : null
     } catch (error: unknown) {
       console.error('CardProgress.findForUserCardAndDirection failed:', error)
@@ -152,17 +128,8 @@ export class CardProgress {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('card_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('direction_id', directionId)
-
-      if (error) {
-        throw new Error(`Database error while fetching card progress: ${error.message}`)
-      }
-
-      return (data ?? []).map((row) => CardProgress.fromJSON(row))
+      const data = await dataRouter.findProgressForUserAndDirection(userId, directionId)
+      return data.map((row) => CardProgress.fromJSON(row))
     } catch (error: unknown) {
       console.error('CardProgress.findAllForUserAndDirection failed:', error)
       throw error
@@ -195,16 +162,7 @@ export class CardProgress {
     if (cardIds.length === 0) return
 
     try {
-      const { error } = await supabase
-        .from('card_progress')
-        .update({ counter: 0, last_updated: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('direction_id', directionId)
-        .in('card_id', cardIds)
-
-      if (error) {
-        throw new Error(`Database error while resetting card progress: ${error.message}`)
-      }
+      await dataRouter.resetProgress(userId, cardIds, directionId)
     } catch (error: unknown) {
       console.error('CardProgress.resetForUserCardsAndDirection failed:', error)
       throw error

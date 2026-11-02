@@ -1,4 +1,4 @@
-import { supabase } from '@/db/supabase'
+import { dataRouter } from '@/data/dataRouter'
 import {
   databaseCharacterLength,
   errorMessage,
@@ -59,56 +59,19 @@ export class Card {
     this.content = this.normalizeContent()
 
     try {
-      let cardId = this.id
-
-      if (!cardId) {
-        // INSERT new card
-        const { data, error } = await supabase
-          .from('card')
-          .insert({
-            deck_id: this.deckId,
-            user_id: this.userId,
-            content: this.content,
-          })
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while inserting card: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        cardId = data.id
-        Object.assign(this, {
-          id: cardId,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
-        })
-      } else {
-        // UPDATE existing card
-        const { data, error } = await supabase
-          .from('card')
-          .update({
-            content: this.content,
-          })
-          .eq('id', cardId)
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while updating card: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        Object.assign(this, {
-          updatedAt: new Date(data.updated_at),
-        })
-      }
-
-      // Sync tags in the card_tag junction table
-      await this.syncTags(cardId!)
+      const saved = await dataRouter.saveCard({
+        id: this.id,
+        deck_id: this.deckId,
+        user_id: this.userId,
+        content: this.content,
+        tag_ids: this.tagIds,
+      })
+      Object.assign(this, {
+        id: saved.id,
+        createdAt: new Date(saved.created_at),
+        updatedAt: new Date(saved.updated_at),
+        tagIds: saved.tag_ids,
+      })
     } catch (error: unknown) {
       console.error('Card.save failed:', error)
       throw error
@@ -201,34 +164,6 @@ export class Card {
   }
 
   /**
-   * @summary Synchronizes associated tag IDs in the card_tag junction table.
-   * @private
-   * @param {string} cardId - The UUID of the card.
-   */
-  private async syncTags(cardId: string): Promise<void> {
-    // 1. Remove existing tag links for this card
-    const { error: deleteError } = await supabase.from('card_tag').delete().eq('card_id', cardId)
-
-    if (deleteError) {
-      throw new Error(`Failed to clear old card tags: ${deleteError.message}`)
-    }
-
-    // 2. Insert new tag links if any are provided
-    if (this.tagIds && this.tagIds.length > 0) {
-      const tagInserts = this.tagIds.map((tagId) => ({
-        card_id: cardId,
-        tag_id: tagId,
-      }))
-
-      const { error: insertError } = await supabase.from('card_tag').insert(tagInserts)
-
-      if (insertError) {
-        throw new Error(`Failed to save card tags: ${insertError.message}`)
-      }
-    }
-  }
-
-  /**
    * @summary Deletes this card from the database.
    * @returns {Promise<void>} A promise that resolves when deletion is complete.
    * @throws {Error} If the card has no ID or the deletion fails.
@@ -239,11 +174,7 @@ export class Card {
     }
 
     try {
-      const { error } = await supabase.from('card').delete().eq('id', this.id)
-
-      if (error) {
-        throw new Error(`Database error while deleting card: ${error.message}`)
-      }
+      await dataRouter.deleteCard(this.id)
     } catch (error: unknown) {
       console.error(`Card.delete failed for ID ${this.id}:`, error)
       throw error
@@ -262,19 +193,8 @@ export class Card {
     }
 
     try {
-      const { data, error } = await supabase.from('card').select('*').eq('id', cardId).single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding card by ID: ${error.message}`)
-      }
-
-      if (!data) return null
-
-      // Fetch associated tag IDs from card_tag junction table
-      const tagIds = await Card.fetchTagIdsForCard(cardId)
-
-      return Card.fromJSON(data, tagIds)
+      const data = await dataRouter.findCardById(cardId)
+      return data ? Card.fromJSON(data, data.tag_ids) : null
     } catch (error: unknown) {
       console.error(`Card.findById failed for ID ${cardId}:`, error)
       throw error
@@ -293,60 +213,12 @@ export class Card {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('card')
-        .select('*')
-        .eq('deck_id', deckId)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        throw new Error(`Database error while fetching deck cards: ${error.message}`)
-      }
-
-      if (!data || data.length === 0) return []
-
-      // Fetch all card-tag relations for these cards in one batch query for efficiency
-      const cardIds = data.map((c) => c.id)
-      const { data: tagRelations, error: tagError } = await supabase
-        .from('card_tag')
-        .select('card_id, tag_id')
-        .in('card_id', cardIds)
-
-      if (tagError) {
-        throw new Error(`Database error while fetching card tags: ${tagError.message}`)
-      }
-
-      // Map tag IDs by card ID for quick lookup
-      const tagMap = new Map<string, string[]>()
-      for (const rel of tagRelations || []) {
-        const existing = tagMap.get(rel.card_id) || []
-        existing.push(rel.tag_id)
-        tagMap.set(rel.card_id, existing)
-      }
-
-      return data.map((row) => Card.fromJSON(row, tagMap.get(row.id) || []))
+      const data = await dataRouter.findCardsForDeck(deckId)
+      return data.map((row) => Card.fromJSON(row, row.tag_ids))
     } catch (error: unknown) {
       console.error('Card.findAllForDeck failed:', error)
       throw error
     }
-  }
-
-  /**
-   * @summary Helper method to fetch tag IDs for a specific card.
-   * @private
-   * @param {string} cardId - The UUID of the card.
-   * @returns {Promise<string[]>} Array of associated tag UUIDs.
-   */
-  private static async fetchTagIdsForCard(cardId: string): Promise<string[]> {
-    const { data, error } = await supabase.from('card_tag').select('tag_id').eq('card_id', cardId)
-
-    if (error) {
-      throw new Error(`Database error while fetching card tags: ${error.message}`)
-    }
-    if (!data) {
-      throw new Error('Database error while fetching card tags: No data returned.')
-    }
-    return data.map((row) => row.tag_id)
   }
 
   /**

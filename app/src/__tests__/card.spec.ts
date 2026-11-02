@@ -73,6 +73,7 @@ vi.mock('@/db/supabase', () => ({
 }))
 
 import { Card } from '@/models/card'
+import { dataRouter, OfflineError } from '@/data/dataRouter'
 
 describe('Card', () => {
   beforeEach(() => {
@@ -220,9 +221,15 @@ describe('Card', () => {
     const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const card = new Card(null, 'deck-1', 'user-1', { s1: 'text' }, [], null, null)
 
-    await expect(card.save()).rejects.toThrow('Failed to clear old card tags: junction unavailable')
+    await expect(card.save()).rejects.toMatchObject({
+      name: 'OfflineError',
+      message: 'Please connect to the Internet — offline data entry is not supported',
+      originalError: expect.objectContaining({
+        message: 'Failed to clear old card tags: junction unavailable',
+      }),
+    })
 
-    expect(logError).toHaveBeenCalledWith('Card.save failed:', expect.any(Error))
+    expect(logError).toHaveBeenCalledWith('Card.save failed:', expect.any(OfflineError))
   })
 
   it('rejects malformed or oversized card rows when parsing', () => {
@@ -258,13 +265,20 @@ describe('Card', () => {
     )
   })
 
-  it('throws when fetching a card fails to fetch its tag relations', async () => {
-    mockTagFindEq.mockResolvedValue({ data: null, error: { message: 'junction unavailable' } })
-    const logError = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('loads the card tag IDs included in the local mirror row', async () => {
+    vi.spyOn(dataRouter, 'findCardById').mockResolvedValue({
+      id: 'card-1',
+      deck_id: 'deck-1',
+      user_id: 'user-1',
+      content: { s1: 'text' },
+      tag_ids: ['tag-1'],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    })
 
-    await expect(Card.findById('card-1')).rejects.toThrow(
-      'Database error while fetching card tags: junction unavailable',
-    )
-    expect(logError).toHaveBeenCalledWith('Card.findById failed for ID card-1:', expect.any(Error))
+    const card = await Card.findById('card-1')
+
+    expect(card?.tagIds).toEqual(['tag-1'])
+    expect(dataRouter.findCardById).toHaveBeenCalledWith('card-1')
   })
 })

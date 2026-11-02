@@ -29,6 +29,32 @@ export default defineConfigWithVueTs(
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
+  {
+    name: 'app/supabase-import-boundary',
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/**/__tests__/**', 'src/**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@/db/supabase',
+              message: 'Import Supabase only from src/data/remoteSource.ts.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    name: 'app/remote-source-supabase-access',
+    files: ['src/data/remoteSource.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+
 {
     plugins: {
         local: {

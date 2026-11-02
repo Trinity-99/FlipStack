@@ -1,4 +1,4 @@
-import { supabase } from '@/db/supabase'
+import { dataRouter } from '@/data/dataRouter'
 import {
   databaseCharacterLength,
   errorMessage,
@@ -37,44 +37,12 @@ export class Tag {
     }
 
     try {
-      if (!this.id) {
-        // INSERT new tag
-        const { data, error } = await supabase
-          .from('tag')
-          .insert({
-            deck_id: this.deckId,
-            name: this.name.trim(),
-          })
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while inserting tag: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        Object.assign(this, {
-          id: data.id,
-          createdAt: new Date(data.created_at),
-        })
-      } else {
-        // UPDATE existing tag
-        const { data, error } = await supabase
-          .from('tag')
-          .update({
-            name: this.name.trim(),
-          })
-          .eq('id', this.id)
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while updating tag: ${error?.message || 'No data returned'}`,
-          )
-        }
-      }
+      const saved = await dataRouter.saveTag({
+        id: this.id,
+        deck_id: this.deckId,
+        name: this.name.trim(),
+      })
+      Object.assign(this, { id: saved.id, createdAt: new Date(saved.created_at) })
     } catch (error: unknown) {
       console.error('Tag.save failed:', error)
       throw error
@@ -92,11 +60,7 @@ export class Tag {
     }
 
     try {
-      const { error } = await supabase.from('tag').delete().eq('id', this.id)
-
-      if (error) {
-        throw new Error(`Database error while deleting tag: ${error.message}`)
-      }
+      await dataRouter.deleteTag(this.id)
     } catch (error: unknown) {
       console.error(`Tag.delete failed for ID ${this.id}:`, error)
       throw error
@@ -115,13 +79,7 @@ export class Tag {
     }
 
     try {
-      const { data, error } = await supabase.from('tag').select('*').eq('id', tagId).single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding tag by ID: ${error.message}`)
-      }
-
+      const data = await dataRouter.findTagById(tagId)
       return data ? Tag.fromJSON(data) : null
     } catch (error: unknown) {
       console.error(`Tag.findById failed for ID ${tagId}:`, error)
@@ -141,17 +99,8 @@ export class Tag {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('tag')
-        .select('*')
-        .eq('deck_id', deckId)
-        .order('name', { ascending: true })
-
-      if (error) {
-        throw new Error(`Database error while fetching deck tags: ${error.message}`)
-      }
-
-      return (data || []).map((row) => Tag.fromJSON(row))
+      const data = await dataRouter.findTagsForDeck(deckId)
+      return data.map((row) => Tag.fromJSON(row))
     } catch (error: unknown) {
       console.error('Tag.findAllForDeck failed:', error)
       throw error

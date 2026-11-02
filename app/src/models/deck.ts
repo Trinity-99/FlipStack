@@ -1,4 +1,4 @@
-import { supabase } from '@/db/supabase'
+import { dataRouter } from '@/data/dataRouter'
 import {
   databaseCharacterLength,
   errorMessage,
@@ -48,52 +48,17 @@ export class Deck {
     this.sideLabels = this.sideLabels.map((label) => label.trim())
 
     try {
-      if (!this.id) {
-        // INSERT new deck
-        const { data, error } = await supabase
-          .from('deck')
-          .insert({
-            user_id: this.userId,
-            title: this.title,
-            side_labels: this.sideLabels,
-          })
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while inserting deck: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        // Mutate instance with generated database values
-        Object.assign(this, {
-          id: data.id,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
-        })
-      } else {
-        // UPDATE existing deck
-        const { data, error } = await supabase
-          .from('deck')
-          .update({
-            title: this.title,
-            side_labels: this.sideLabels,
-          })
-          .eq('id', this.id)
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while updating deck: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        Object.assign(this, {
-          updatedAt: new Date(data.updated_at),
-        })
-      }
+      const saved = await dataRouter.saveDeck({
+        id: this.id,
+        user_id: this.userId,
+        title: this.title,
+        side_labels: this.sideLabels,
+      })
+      Object.assign(this, {
+        id: saved.id,
+        createdAt: new Date(saved.created_at),
+        updatedAt: new Date(saved.updated_at),
+      })
     } catch (error: unknown) {
       console.error('Deck.save failed:', error)
       throw error
@@ -144,11 +109,7 @@ export class Deck {
     }
 
     try {
-      const { error } = await supabase.from('deck').delete().eq('id', this.id)
-
-      if (error) {
-        throw new Error(`Database error while deleting deck: ${error.message}`)
-      }
+      await dataRouter.deleteDeck(this.id)
     } catch (error: unknown) {
       console.error(`Deck.delete failed for ID ${this.id}:`, error)
       throw error
@@ -167,13 +128,7 @@ export class Deck {
     }
 
     try {
-      const { data, error } = await supabase.from('deck').select('*').eq('id', deckId).single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding deck by ID: ${error.message}`)
-      }
-
+      const data = await dataRouter.findDeckById(deckId)
       return data ? Deck.fromJSON(data) : null
     } catch (error: unknown) {
       console.error(`Deck.findById failed for ID ${deckId}:`, error)
@@ -193,17 +148,8 @@ export class Deck {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('deck')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        throw new Error(`Database error while fetching user decks: ${error.message}`)
-      }
-
-      return (data || []).map((row) => Deck.fromJSON(row))
+      const data = await dataRouter.findDecksForUser(userId)
+      return data.map((row) => Deck.fromJSON(row))
     } catch (error: unknown) {
       console.error('Deck.findAllForUser failed:', error)
       throw error

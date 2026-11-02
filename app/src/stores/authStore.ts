@@ -2,6 +2,7 @@ import { computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { Session } from '@supabase/supabase-js'
 import { Profile } from '@/models/profile'
+import { StartupSyncError } from '@/data/dataRouter'
 
 /**
  * @summary Stores and restores the current user's profile and authentication session.
@@ -10,7 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const profile = shallowRef<Profile | null>(null)
   const session = shallowRef<Session | null>(null)
   const initializationError = shallowRef<string | null>(null)
-  const isAuthenticated = computed(() => profile.value !== null && session.value !== null)
+  const isAuthenticated = computed(() => profile.value !== null)
   const isRestoring = shallowRef(false)
   const hasRestoredAuthentication = shallowRef(false)
   let restorationPromise: Promise<void> | null = null
@@ -34,7 +35,10 @@ export const useAuthStore = defineStore('auth', () => {
           setAuthenticated(authentication.profile, authentication.session)
         }
       } catch (error: unknown) {
-        initializationError.value = 'Unable to restore your session. Please sign in again.'
+        initializationError.value =
+          error instanceof StartupSyncError
+            ? error.message
+            : 'Unable to restore your session. Please try again.'
         throw error
       } finally {
         hasRestoredAuthentication.value = true
@@ -52,7 +56,10 @@ export const useAuthStore = defineStore('auth', () => {
    * @param {Session} authenticatedSession - The active Supabase session.
    * @returns {void}
    */
-  function setAuthenticated(authenticatedProfile: Profile, authenticatedSession: Session): void {
+  function setAuthenticated(
+    authenticatedProfile: Profile,
+    authenticatedSession: Session | null,
+  ): void {
     profile.value = authenticatedProfile
     session.value = authenticatedSession
     initializationError.value = null
@@ -68,6 +75,15 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = updatedProfile
   }
 
+  /**
+   * @summary Retries a failed authentication restoration after connectivity changes.
+   * @returns {Promise<void>} A promise that resolves when restoration completes.
+   */
+  async function retryAuthentication(): Promise<void> {
+    hasRestoredAuthentication.value = false
+    await restoreAuthentication()
+  }
+
   return {
     profile,
     session,
@@ -78,5 +94,6 @@ export const useAuthStore = defineStore('auth', () => {
     restoreAuthentication,
     setAuthenticated,
     setProfile,
+    retryAuthentication,
   }
 })

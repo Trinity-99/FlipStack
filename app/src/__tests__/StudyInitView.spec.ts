@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useDeckStore } from '@/stores/deckStore'
 import { useStudyStore } from '@/stores/studyStore'
+import { dataRouter } from '@/data/dataRouter'
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const deck = new Deck('deck-1', 'user-1', 'Language', ['Script', 'Meaning'], createdAt, createdAt)
@@ -48,6 +49,7 @@ describe('StudyInitView', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
+    vi.spyOn(dataRouter, 'saveDeckPreference').mockImplementation(async (row) => row)
     vi.spyOn(Deck, 'findById').mockResolvedValue(deck)
 
     const preference = {
@@ -240,8 +242,6 @@ describe('StudyInitView', () => {
 
     const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
     await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
-    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
-    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
     await flushPromises()
     await wrapper.get('[role="dialog"] form').trigger('submit')
     await flushPromises()
@@ -274,8 +274,6 @@ describe('StudyInitView', () => {
     await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
     const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
     await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
-    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
-    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
     await flushPromises()
     await wrapper.get('[role="dialog"] form').trigger('submit')
     await flushPromises()
@@ -299,15 +297,11 @@ describe('StudyInitView', () => {
     await wrapper.get('[aria-label="Study direction"]').setValue('create-direction')
     const questionButtons = wrapper.findAll('[role="dialog"] fieldset')[0]?.findAll('button')
     await questionButtons?.find((button) => button.text() === 'Script')?.trigger('click')
-    const answerButtons = wrapper.findAll('[role="dialog"] fieldset')[1]?.findAll('button')
-    await answerButtons?.find((button) => button.text() === 'Meaning')?.trigger('click')
     await flushPromises()
     await wrapper.get('[role="dialog"] form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain(
-      'This direction already exists for this deck. Choose a different combination of sides or reveal order.',
-    )
+    expect(wrapper.text()).toContain('This direction already exists.')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
   })
 

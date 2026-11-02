@@ -8,6 +8,7 @@ import { Tag } from '@/models/tag'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useDeckStore } from '@/stores/deckStore'
+import { dataRouter } from '@/data/dataRouter'
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const userDecks = [
@@ -19,6 +20,7 @@ describe('useDeckStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.restoreAllMocks()
+    vi.spyOn(dataRouter, 'prepareDeckSwitch').mockResolvedValue()
   })
 
   function mockDeckData(): void {

@@ -114,7 +114,7 @@ describe('useAuthStore', () => {
 
     await expect(store.restoreAuthentication()).rejects.toThrow('Restore failed')
 
-    expect(store.initializationError).toBe('Unable to restore your session. Please sign in again.')
+    expect(store.initializationError).toBe('Unable to restore your session. Please try again.')
     expect(store.isRestoring).toBe(false)
     expect(store.hasRestoredAuthentication).toBe(true)
 

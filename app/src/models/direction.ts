@@ -1,4 +1,4 @@
-import { supabase } from '@/db/supabase'
+import { dataRouter } from '@/data/dataRouter'
 import { Deck } from '@/models/deck'
 import { errorMessage, isDatabaseRecord, requiredDate, requiredString } from '@/models/modelUtils'
 
@@ -48,44 +48,12 @@ export class Direction {
     Direction.validateConfiguration(this.configuration)
 
     try {
-      if (!this.id) {
-        // INSERT new direction
-        const { data, error } = await supabase
-          .from('direction')
-          .insert({
-            deck_id: this.deckId,
-            configuration: this.configuration,
-          })
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while inserting direction: ${error?.message || 'No data returned'}`,
-          )
-        }
-
-        Object.assign(this, {
-          id: data.id,
-          createdAt: new Date(data.created_at),
-        })
-      } else {
-        // UPDATE existing direction
-        const { data, error } = await supabase
-          .from('direction')
-          .update({
-            configuration: this.configuration,
-          })
-          .eq('id', this.id)
-          .select()
-          .single()
-
-        if (error || !data) {
-          throw new Error(
-            `Database error while updating direction: ${error?.message || 'No data returned'}`,
-          )
-        }
-      }
+      const saved = await dataRouter.saveDirection({
+        id: this.id,
+        deck_id: this.deckId,
+        configuration: this.configuration,
+      })
+      Object.assign(this, { id: saved.id, createdAt: new Date(saved.created_at) })
     } catch (error: unknown) {
       console.error('Direction.save failed:', error)
       throw error
@@ -103,11 +71,7 @@ export class Direction {
     }
 
     try {
-      const { error } = await supabase.from('direction').delete().eq('id', this.id)
-
-      if (error) {
-        throw new Error(`Database error while deleting direction: ${error.message}`)
-      }
+      await dataRouter.deleteDirection(this.id)
     } catch (error: unknown) {
       console.error(`Direction.delete failed for ID ${this.id}:`, error)
       throw error
@@ -126,17 +90,7 @@ export class Direction {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('direction')
-        .select('*')
-        .eq('id', directionId)
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding direction by ID: ${error.message}`)
-      }
-
+      const data = await dataRouter.findDirectionById(directionId)
       return data ? Direction.fromJSON(data) : null
     } catch (error: unknown) {
       console.error(`Direction.findById failed for ID ${directionId}:`, error)
@@ -156,17 +110,8 @@ export class Direction {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('direction')
-        .select('*')
-        .eq('deck_id', deckId)
-        .order('created_at', { ascending: true })
-
-      if (error) {
-        throw new Error(`Database error while fetching deck directions: ${error.message}`)
-      }
-
-      return (data || []).map((row) => Direction.fromJSON(row))
+      const data = await dataRouter.findDirectionsForDeck(deckId)
+      return data.map((row) => Direction.fromJSON(row))
     } catch (error: unknown) {
       console.error('Direction.findAllForDeck failed:', error)
       throw error

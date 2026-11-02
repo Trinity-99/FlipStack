@@ -28,6 +28,15 @@ async function waitForInitialNavigation(): Promise<void> {
   }
 }
 
+async function retryStartup(): Promise<void> {
+  try {
+    await authStore.retryAuthentication()
+    if (authStore.isAuthenticated) await router.replace({ name: 'SessionStart' })
+  } catch (error: unknown) {
+    console.error('App could not retry startup authentication:', error)
+  }
+}
+
 onMounted(() => {
   void waitForInitialNavigation()
 })
@@ -35,7 +44,25 @@ onMounted(() => {
 
 <template>
   <main
-    v-if="isStartupPending"
+    v-if="authStore.initializationError"
+    class="flex min-h-dvh items-center justify-center bg-app px-4"
+  >
+    <section
+      class="w-full max-w-md rounded-3xl border-2 border-rose-500/50 bg-rose-950/90 p-6 text-rose-200 shadow-2xl"
+      role="alert"
+    >
+      <p>{{ authStore.initializationError }}</p>
+      <button
+        type="button"
+        class="mt-4 min-h-11 rounded-xl bg-surface-muted px-4 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+        @click="retryStartup"
+      >
+        Retry
+      </button>
+    </section>
+  </main>
+  <main
+    v-else-if="isStartupPending"
     class="flex min-h-dvh items-center justify-center bg-app"
     role="status"
     aria-label="Loading app"

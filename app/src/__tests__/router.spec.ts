@@ -62,7 +62,7 @@ describe('startup router guard', () => {
 
     expect(router.currentRoute.value.name).toBe('Login')
     expect(useAuthStore().initializationError).toBe(
-      'Unable to restore your session. Please sign in again.',
+      'Unable to restore your session. Please try again.',
     )
   })
 

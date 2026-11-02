@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Session } from '@supabase/supabase-js'
 import { Profile } from '@/models/profile'
+import { dataRouter } from '@/data/dataRouter'
 
 const { authGetSession, authSignIn, profileFrom } = vi.hoisted(() => ({
   authGetSession: vi.fn<() => Promise<unknown>>(),
@@ -19,6 +20,7 @@ const profileRow = {
   id: 'user-1',
   created_at: '2026-01-01T00:00:00.000Z',
   updated_at: '2026-01-01T00:00:00.000Z',
+  last_active_deck_id: null,
 }
 
 const session: Session = {
@@ -44,6 +46,8 @@ const profileQuery = {
 describe('Profile authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(dataRouter, 'prepareAuthenticatedUser').mockResolvedValue()
+    vi.spyOn(dataRouter, 'findProfileById').mockResolvedValue(profileRow)
     profileQuery.select.mockReturnThis()
     profileQuery.eq.mockReturnThis()
     profileFrom.mockReturnValue(profileQuery)
@@ -64,8 +68,8 @@ describe('Profile authentication', () => {
     const result = await Profile.authenticate(' user@example.com ', 'password')
 
     expect(authSignIn).toHaveBeenCalledWith({ email: 'user@example.com', password: 'password' })
-    expect(profileFrom).toHaveBeenCalledWith('profile')
-    expect(profileQuery.eq).toHaveBeenCalledWith('id', 'user-1')
+    expect(dataRouter.prepareAuthenticatedUser).toHaveBeenCalledWith('user-1')
+    expect(dataRouter.findProfileById).toHaveBeenCalledWith('user-1')
     expect(result.profile).toBeInstanceOf(Profile)
     expect(result.session).toBe(session)
   })
@@ -76,10 +80,23 @@ describe('Profile authentication', () => {
     const result = await Profile.restoreAuthentication()
 
     expect(authGetSession).toHaveBeenCalledOnce()
-    expect(profileFrom).toHaveBeenCalledWith('profile')
-    expect(profileQuery.eq).toHaveBeenCalledWith('id', 'user-1')
+    expect(dataRouter.prepareAuthenticatedUser).toHaveBeenCalledWith('user-1')
+    expect(dataRouter.findProfileById).toHaveBeenCalledWith('user-1')
     expect(result?.profile).toBeInstanceOf(Profile)
     expect(result?.session).toBe(session)
+  })
+
+  it('uses the local profile when session restoration cannot reach Supabase', async () => {
+    const networkError = new TypeError('Failed to fetch')
+    authGetSession.mockResolvedValue({ data: { session: null }, error: networkError })
+    vi.spyOn(dataRouter, 'getLocalOwnerUserId').mockResolvedValue('user-1')
+
+    const result = await Profile.restoreAuthentication()
+
+    expect(result?.profile).toBeInstanceOf(Profile)
+    expect(result?.session).toBeNull()
+    expect(dataRouter.findProfileById).toHaveBeenCalledWith('user-1')
+    expect(dataRouter.prepareAuthenticatedUser).not.toHaveBeenCalled()
   })
 
   it('returns null when no persisted session exists', async () => {
@@ -119,7 +136,7 @@ describe('Profile authentication', () => {
       data: { user: session.user, session },
       error: null,
     })
-    profileQuery.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+    vi.mocked(dataRouter.findProfileById).mockResolvedValue(null)
 
     await expect(Profile.authenticate('user@example.com', 'password')).rejects.toMatchObject({
       name: 'AuthenticationError',
@@ -139,32 +156,29 @@ describe('Profile authentication', () => {
 
   it('returns null when a profile does not exist', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    profileQuery.single.mockResolvedValue({ data: null, error: { code: 'PGRST116' } })
+    vi.mocked(dataRouter.findProfileById).mockResolvedValue(null)
 
     await expect(Profile.findById('missing-user')).resolves.toBeNull()
   })
 
   it('loads per-deck preferences with the profile', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    profileQuery.single.mockResolvedValue({
-      data: {
-        ...profileRow,
-        user_deck_preferences: [
-          {
-            deck_id: 'deck-1',
-            last_selected_direction_id: 'direction-1',
-            last_selected_tag_id: 'tag-1',
-          },
-        ],
-      },
-      error: null,
+    vi.mocked(dataRouter.findProfileById).mockResolvedValue({
+      ...profileRow,
+      user_deck_preferences: [
+        {
+          user_id: 'user-1',
+          deck_id: 'deck-1',
+          last_selected_direction_id: 'direction-1',
+          last_selected_tag_id: 'tag-1',
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
     })
 
     const result = await Profile.findById('user-1')
 
-    expect(profileQuery.select).toHaveBeenCalledWith(
-      '*, user_deck_preferences:user_deck_preference(*)',
-    )
+    expect(dataRouter.findProfileById).toHaveBeenCalledWith('user-1')
     expect(result?.getDeckPreference('deck-1')).toEqual({
       deckId: 'deck-1',
       lastSelectedDirectionId: 'direction-1',

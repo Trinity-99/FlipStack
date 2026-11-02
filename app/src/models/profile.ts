@@ -5,10 +5,12 @@ import {
   optionalString,
   requiredString,
 } from '@/models/modelUtils'
-import { supabase } from '@/db/supabase'
+import { AuthenticationError } from '@/data/authenticationError'
+import { OfflineError, StartupSyncError, dataRouter } from '@/data/dataRouter'
+import type { DeckPreferenceRow, ProfileRow } from '@/data/dataTypes'
+export { AuthenticationError } from '@/data/authenticationError'
+export type { AuthenticationFailureKind } from '@/data/authenticationError'
 import type { Session } from '@supabase/supabase-js'
-
-export type AuthenticationFailureKind = 'invalid-credentials' | 'network' | 'unexpected'
 
 /**
  * @summary Represents a categorized failure during email and password authentication.
@@ -16,23 +18,12 @@ export type AuthenticationFailureKind = 'invalid-credentials' | 'network' | 'une
  * @param {string} message - A safe description of the failure.
  * @param {unknown} originalError - The original failure, when available.
  */
-export class AuthenticationError extends Error {
-  constructor(
-    public readonly kind: AuthenticationFailureKind,
-    message: string,
-    public readonly originalError?: unknown,
-  ) {
-    super(message)
-    this.name = 'AuthenticationError'
-  }
-}
-
 /**
  * @summary Contains the authenticated user's profile and Supabase session.
  */
 export interface AuthenticationResult {
   readonly profile: Profile
-  readonly session: Session
+  readonly session: Session | null
 }
 
 /**
@@ -42,23 +33,6 @@ export interface DeckPreference {
   readonly deckId: string
   readonly lastSelectedDirectionId: string | null
   readonly lastSelectedTagId: string | null
-}
-
-function isErrorRecord(error: unknown): error is Record<string, unknown> {
-  return typeof error === 'object' && error !== null
-}
-
-function isInvalidCredentialsError(error: unknown): boolean {
-  if (!isErrorRecord(error)) return false
-  return error.code === 'invalid_credentials' || error.status === 401
-}
-
-function isNetworkError(error: unknown): boolean {
-  if (error instanceof TypeError) return true
-  if (error instanceof Error) {
-    return error.name === 'AuthRetryableFetchError' || error.name === 'FetchError'
-  }
-  return false
 }
 
 /**
@@ -111,21 +85,14 @@ export class Profile {
    * @returns An updated immutable `Profile` instance with the saved preference in memory.
    */
   public async saveDeckPreference(pref: DeckPreference): Promise<Profile> {
-    const { error } = await supabase.from('user_deck_preference').upsert(
-      {
-        user_id: this.id,
-        deck_id: pref.deckId,
-        last_selected_direction_id: pref.lastSelectedDirectionId,
-        last_selected_tag_id: pref.lastSelectedTagId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,deck_id' },
-    )
-
-    if (error) {
-      throw new Error(`Failed to save deck preference to database: ${error.message}`)
+    const row: DeckPreferenceRow = {
+      user_id: this.id,
+      deck_id: pref.deckId,
+      last_selected_direction_id: pref.lastSelectedDirectionId,
+      last_selected_tag_id: pref.lastSelectedTagId,
+      updated_at: new Date().toISOString(),
     }
-
+    await dataRouter.saveDeckPreference(row)
     return this.withDeckPreference(pref)
   }
 
@@ -133,18 +100,13 @@ export class Profile {
    * @summary Persists the profile's global settings (e.g., `last_active_deck_id`) to Supabase.
    */
   public async saveLastActiveDeck(deckId: string | null): Promise<Profile> {
-    const { error } = await supabase
-      .from('profile')
-      .update({
-        last_active_deck_id: deckId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', this.id)
-
-    if (error) {
-      throw new Error(`Failed to update last active deck in database: ${error.message}`)
+    const row: ProfileRow = {
+      id: this.id,
+      created_at: this.createdAt.toISOString(),
+      updated_at: new Date().toISOString(),
+      last_active_deck_id: deckId,
     }
-
+    await dataRouter.saveProfileSettings(row)
     return new Profile(this.id, this.createdAt, new Date(), deckId, this.deckPreferences)
   }
 
@@ -161,28 +123,20 @@ export class Profile {
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await dataRouter.signInWithPassword({
         email: email.trim(),
         password,
       })
 
       if (error) {
-        const kind = isInvalidCredentialsError(error)
-          ? 'invalid-credentials'
-          : isNetworkError(error)
-            ? 'network'
-            : 'unexpected'
-        const message =
-          kind === 'network'
-            ? 'Unable to connect to the authentication service.'
-            : 'Supabase authentication was rejected.'
-        throw new AuthenticationError(kind, message, error)
+        throw new AuthenticationError('unexpected', 'Supabase authentication was rejected.', error)
       }
 
       if (!data.user || !data.session) {
         throw new Error('Supabase authentication returned no user or session.')
       }
 
+      await dataRouter.prepareAuthenticatedUser(data.user.id)
       const profile = await Profile.findById(data.user.id)
       if (!profile) {
         throw new Error(`No profile found for authenticated user ${data.user.id}.`)
@@ -196,19 +150,12 @@ export class Profile {
         throw error
       }
 
-      const kind = isInvalidCredentialsError(error)
-        ? 'invalid-credentials'
-        : isNetworkError(error)
-          ? 'network'
-          : 'unexpected'
-      const message =
-        kind === 'network'
-          ? 'Unable to connect to the authentication service.'
-          : kind === 'invalid-credentials'
-            ? 'Invalid login credentials.'
-            : `Authentication failed: ${errorMessage(error)}`
-
-      throw new AuthenticationError(kind, message, error)
+      if (error instanceof StartupSyncError || error instanceof OfflineError) throw error
+      throw new AuthenticationError(
+        'unexpected',
+        `Authentication failed: ${errorMessage(error)}`,
+        error,
+      )
     }
   }
 
@@ -219,12 +166,27 @@ export class Profile {
    */
   public static async restoreAuthentication(): Promise<AuthenticationResult | null> {
     try {
-      const { data, error } = await supabase.auth.getSession()
+      const { data, error } = await dataRouter.getSession()
       if (error) {
-        throw new Error(`Failed to restore the authentication session: ${error.message}`)
+        const isNetworkFailure =
+          error instanceof TypeError ||
+          (error instanceof Error &&
+            ['AuthRetryableFetchError', 'FetchError'].includes(error.name))
+        const ownerId = await dataRouter.getLocalOwnerUserId()
+        const localProfile = ownerId ? await Profile.findById(ownerId) : null
+        if (isNetworkFailure && localProfile) {
+          return { profile: localProfile, session: null }
+        }
+        if (isNetworkFailure) throw new StartupSyncError()
+        throw new AuthenticationError(
+          'unexpected',
+          `Failed to restore the authentication session: ${error.message}`,
+          error,
+        )
       }
       if (!data.session) return null
 
+      await dataRouter.prepareAuthenticatedUser(data.session.user.id)
       const profile = await Profile.findById(data.session.user.id)
       if (!profile) {
         throw new Error(`No profile found for authenticated user ${data.session.user.id}.`)
@@ -249,17 +211,7 @@ export class Profile {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('profile')
-        .select('*, user_deck_preferences:user_deck_preference(*)')
-        .eq('id', profileId)
-        .single()
-
-      if (error) {
-        if (error.code === 'PGRST116') return null
-        throw new Error(`Database error while finding profile by ID: ${error.message}`)
-      }
-
+      const data = await dataRouter.findProfileById(profileId)
       return data ? Profile.fromJSON(data) : null
     } catch (error: unknown) {
       console.error(`Profile.findById failed for ID ${profileId}:`, error)

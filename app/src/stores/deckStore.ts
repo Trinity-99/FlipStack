@@ -8,6 +8,7 @@ import { Tag } from '@/models/tag'
 import { StudyService } from '@/engine/studyService'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
+import { dataRouter } from '@/data/dataRouter'
 
 interface ActiveDeckData {
   directions: Direction[]
@@ -289,6 +290,7 @@ export const useDeckStore = defineStore('decks', () => {
     error.value = null
 
     try {
+      await dataRouter.prepareDeckSwitch(deckId)
       const activeData = await loadActiveDeckData(deckId)
       const updatedProfile = await profile.saveLastActiveDeck(deckId)
 

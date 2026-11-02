@@ -9,7 +9,7 @@ This document describes the architecture of FlipStack: the layers, the technolog
 
 ## 2 Overview
 
-FlipStack is a cloud-first, mobile-first Progressive Web App. All application logic runs in the client. Supabase provides authentication and the database. A local database (IndexedDB) is used for offline learning.
+FlipStack is a cloud-first, mobile-first Progressive Web App. All application logic runs in the client. Supabase provides authentication and the database. A local database (IndexedDB) holds a mirror of the user's data, so learning works offline.
 
 ```
 +--------------------------------------------------+
@@ -21,9 +21,12 @@ FlipStack is a cloud-first, mobile-first Progressive Web App. All application lo
 | Domain Models (Active Record)                    |
 | domain logic and persistence                     |
 +--------------------------------------------------+
-| Supabase                                         |
-| Auth, PostgreSQL + Row-Level Security            |
-+--------------------------------------------------+
+| Data Router                                      |
+| decides which source serves which data           |
++------------------------+-------------------------+
+| Remote Source          | Local Source            |
+| Supabase               | IndexedDB               |
++------------------------+-------------------------+
 ```
 
 **Rules**
@@ -31,7 +34,7 @@ FlipStack is a cloud-first, mobile-first Progressive Web App. All application lo
 - Views and stores may use the study engine and the models directly.
 - The study engine uses the models.
 - Models never call upward.
-- Only the models access data.
+- Only the models access data, and only through the data router. Only the router uses the sources.
 
 ## 3 Technology Stack
 
@@ -45,17 +48,44 @@ FlipStack is a cloud-first, mobile-first Progressive Web App. All application lo
 | App type | Progressive Web App (installable on iOS and Android) |
 | Backend | Supabase: Auth, PostgreSQL, Row-Level Security |
 | Backend access | `@supabase/supabase-js` |
-| Offline learning | Local database (IndexedDB) |
+| Offline learning | Local database (IndexedDB) via Dexie |
 
 ## 4 Pattern: Pure Active Record
 
 - Each domain model contains its properties, its domain behavior and its own persistence (save, delete, queries).
 - There is no separate service or repository layer.
 - Models accept and return domain objects, not raw JSON.
-- Only the models access data. Today they call Supabase directly; later they go through a data-source factory, which alone knows whether the data comes from Supabase or the local database.
+- Only the models access data, and only through the data router (4.1).
 - The Supabase client is initialized in one place and contains no data logic.
 
 The detailed rules for models are in the Coding Guidelines.
+
+### 4.1 Data Layer
+
+The data layer has three parts with one job each:
+
+- **Remote source:** the only code that talks to Supabase. It knows nothing about IndexedDB.
+- **Local source:** the only code that talks to IndexedDB. It knows nothing about Supabase.
+- **Data router:** the only thing the models talk to. It decides, per kind of data, which source to use and in what order.
+
+Nothing above the router knows where data lives. Only three things cross it: the sync status, a defined error when content cannot be saved offline, and a loading state while the active deck is not yet available.
+
+### 4.2 Storage Policy
+
+| Data | Read | Write |
+|---|---|---|
+| Content (decks, cards, tags, directions) | Local source | Remote source first, then local source. Requires a connection. |
+| Progress (`card_progress`) | Local source | Local source first, sent to the remote source in the background |
+
+### 4.3 Sync
+
+The router keeps the local mirror aligned with Supabase.
+
+- Content is pulled from Supabase only at app start. The active deck is loaded completely before any view is shown; the other decks follow in the background.
+- A sync that fails or takes too long counts as offline for that session and is retried at the next start.
+- A deck replaces its local copy completely or not at all.
+- When the connection returns, only unsent progress is sent.
+- Progress is compared by update time; the newer update wins.
 
 ## 5 Data Model
 
@@ -91,6 +121,7 @@ app/src/
 ├── App.vue
 └── main.ts
 ```
+
 ## 8 Security Controls
 
 Chapter 6 defines authorization and the client key. This chapter defines the controls that follow from it. The client is untrusted: the database enforces every rule that protects data, and the app adds a second line of defense.
@@ -131,8 +162,8 @@ All controls below are defined in `createDatabase.sql`.
 
 **Offline data**
 
-- The local database (IndexedDB) is cleared on logout.
-- Local data is synced only through the models and the authenticated Supabase client, so Row-Level Security always applies.
+- The local database (IndexedDB) belongs to one user. It is cleared on logout and when a different user signs in. An expired session does not clear it.
+- Local data reaches Supabase only through the data router and the authenticated Supabase client, so Row-Level Security always applies. 
 
 **Service worker**
 
@@ -151,9 +182,9 @@ The app never sends SQL. All data access goes through `supabase-js`, which sends
 ### 9.1 App Code
 
 - User input reaches the database only as a parameter of a builder method (`.eq()`, `.in()`, `.insert()`, `.update()` and similar).
-- User input is never concatenated into a string that the client library interprets, such as the arguments of `.or()`, `.filter()` or `.not()`. Where a dynamic filter is unavoidable, the model builds it from validated values only.
-- Column names for sorting and filtering come from a fixed list in the model, never from user input.
-- Only the models build queries (see chapter 4), so these rules apply in one place.
+- User input is never concatenated into a string that the client library interprets, such as the arguments of `.or()`, `.filter()` or `.not()`. Where a dynamic filter is unavoidable, the data layer builds it from validated values only.
+- Column names for sorting and filtering come from a fixed list in the data layer, never from user input.
+- Only the remote source builds queries (see 4.1), so these rules apply in one place.
 
 ### 9.2 Database
 

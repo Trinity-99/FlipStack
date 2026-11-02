@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import BottomNavigation from '@/components/BottomNavigation.vue'
 import DeckSwitcher from '@/components/DeckSwitcher.vue'
 import FeedbackBanner from '@/components/FeedbackBanner.vue'
+import SyncStatusDot from '@/components/SyncStatusDot.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 
@@ -68,6 +69,8 @@ async function retryDeckLoading(): Promise<void> {
               />
             </svg>
           </RouterLink>
+
+          <SyncStatusDot />
         </div>
       </header>
 
