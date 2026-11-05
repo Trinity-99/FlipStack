@@ -310,9 +310,9 @@ watch(
 </script>
 
 <template>
-  <section class="mx-auto w-full max-w-md" aria-labelledby="card-edit-title">
+  <section class="mx-auto w-full" aria-labelledby="card-edit-title">
     <header class="relative mb-4 sm:mb-6">
-      <h1 id="card-edit-title" class="text-2xl font-bold text-primary">
+      <h1 id="card-edit-title" class="text-2xl font-bold text-primary sm:text-3xl">
         {{ isEditMode ? 'Edit card' : 'Create a card' }}
       </h1>
     </header>
@@ -321,7 +321,7 @@ watch(
 
     <form
       novalidate
-      class="space-y-3 rounded-card border-2 border-slate-600 bg-card p-4 shadow-2xl sm:space-y-5 sm:p-6"
+      class="space-y-3 rounded-card border-2 border-slate-600 bg-card p-4 shadow-2xl sm:space-y-5 sm:p-8"
       @submit.prevent
     >
       <fieldset :disabled="isFormDisabled" class="space-y-3 sm:space-y-5">

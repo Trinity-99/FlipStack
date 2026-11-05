@@ -102,6 +102,10 @@ describe('StudyInitView', () => {
     )
     expect(wrapper.text()).toContain('Script - Meaning')
     expect(wrapper.text()).toContain('1/1')
+    expect(wrapper.get('section').classes()).not.toContain('max-w-md')
+    expect(wrapper.get('h1').classes()).toContain('sm:text-3xl')
+    const setupCard = wrapper.get('h1').element.parentElement?.parentElement
+    expect(setupCard?.classList.contains('sm:p-8')).toBe(true)
   })
 
   it('falls back to Whole Deck and the first direction for stale preferences', async () => {

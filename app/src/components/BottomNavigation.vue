@@ -12,7 +12,7 @@ const isStudyActive = computed(() => route.path.startsWith('/study'))
     aria-label="Main navigation"
     class="sticky bottom-0 z-20 mt-auto border-t border-border-subtle bg-card/95 px-4 pt-2 pb-[env(safe-area-inset-bottom)] backdrop-blur"
   >
-    <div class="mx-auto grid max-w-md grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-2">
       <RouterLink
         :to="{ name: 'SessionStart' }"
         class="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"

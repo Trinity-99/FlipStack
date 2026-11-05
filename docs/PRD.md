@@ -157,7 +157,7 @@ For desktop/non-touch browsers or accessibility, dedicated UI buttons with visua
 
 ## **5.1 MVP (Phase 1\)**
 
-* Mobile-first responsive Web application UI (PWA enabled).  
+* Mobile-first UI: full width on phones, a centered 720 px column from 640 px up (PWA enabled).  
 * User authentication (Login) with private user data isolation via Supabase RLS. Login only for now; the sign-up screen is deferred.  
 * Custom Deck Creation with user-defined 3-side labels. 2 or 3 labels; multiple decks.  
 * Full 3-Sided Card CRUD (Create, Read, Update, Delete) with optional fields. The card list can be sorted by any side (e.g., to find cards that still lack a Script) and filtered by tag.  

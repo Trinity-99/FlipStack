@@ -73,6 +73,11 @@ describe('CardListView', () => {
     expect(wrapper.text()).toContain('Sawadee')
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
     expect(wrapper.findAll('tbody td')).toHaveLength(3)
+    expect(wrapper.get('h1').classes()).toContain('sm:text-3xl')
+    expect(wrapper.find('.overflow-x-auto').exists()).toBe(false)
+    expect(
+      wrapper.get('[aria-label="Filter cards by tag"]').element.closest('div')?.className,
+    ).not.toContain('sm:grid-cols-2')
   })
 
   it('renders only configured side headers and columns for a two-sided deck', () => {

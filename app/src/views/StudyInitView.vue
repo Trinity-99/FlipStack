@@ -241,7 +241,7 @@ watch([selectedTagId, selectedDirection], refreshPoolSummary)
 </script>
 
 <template>
-  <section class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4">
+  <section class="mx-auto flex w-full flex-1 flex-col justify-center gap-4 sm:gap-6">
     <FeedbackBanner
       v-if="studyFeedback"
       :message="studyFeedback.message"
@@ -268,14 +268,14 @@ watch([selectedTagId, selectedDirection], refreshPoolSummary)
 
     <div
       v-else-if="deckStore.activeDeck && selectedDirection"
-      class="rounded-3xl border-2 border-slate-600 bg-card p-5 shadow-2xl sm:p-6"
+      class="rounded-3xl border-2 border-slate-600 bg-card p-5 shadow-2xl sm:p-8"
     >
-      <header class="mb-6 text-center">
-        <h1 class="text-2xl font-semibold text-primary">Ready to learn?</h1>
+      <header class="mb-6 text-center sm:mb-8">
+        <h1 class="text-2xl font-semibold text-primary sm:text-3xl">Ready to learn?</h1>
         <p class="mt-2 text-sm text-secondary">Choose a topic and direction for this session.</p>
       </header>
 
-      <div class="mb-6 grid gap-4">
+      <div class="mb-6 grid gap-4 sm:gap-6">
         <label class="flex flex-col gap-2 text-sm font-medium text-primary">
           Topic
           <select
@@ -312,7 +312,7 @@ watch([selectedTagId, selectedDirection], refreshPoolSummary)
         </label>
       </div>
 
-      <div class="mb-6 rounded-2xl bg-surface-muted/70 px-4 py-5 text-center">
+      <div class="mb-6 rounded-2xl bg-surface-muted/70 px-4 py-5 text-center sm:px-6 sm:py-6">
         <p class="text-sm text-secondary">Cards to learn</p>
         <p class="mt-1 text-4xl font-bold tabular-nums text-primary" aria-live="polite">
           <span v-if="summary">

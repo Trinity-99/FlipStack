@@ -21,6 +21,30 @@ interface PointerEventOptions {
   timeStamp?: number
 }
 
+let studyResizeObserver: TestResizeObserver | null = null
+
+class TestResizeObserver implements ResizeObserver {
+  constructor(private readonly callback: ResizeObserverCallback) {
+    studyResizeObserver = this
+  }
+
+  observe(target: Element): void {
+    Object.defineProperties(target, {
+      clientWidth: { configurable: true, value: 400 },
+      clientHeight: { configurable: true, value: 320 },
+    })
+    this.callback([], this)
+  }
+
+  unobserve(_target: Element): void {}
+
+  disconnect(): void {}
+
+  trigger(): void {
+    this.callback([], this)
+  }
+}
+
 const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const deck = new Deck('deck-1', 'user-1', 'Language', ['Prompt', 'Answer'], createdAt, createdAt)
 const direction = new Direction(
@@ -64,6 +88,8 @@ describe('StudyView', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    studyResizeObserver = null
   })
 
   async function mountStudyView(progressRecords: CardProgress[] = [], prepareSession = true) {
@@ -118,6 +144,29 @@ describe('StudyView', () => {
 
     await wrapper.get('[aria-label="Previous side"]').trigger('click')
     expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text')
+  })
+
+  it('keeps the prism aligned with the stage height when the responsive stage resizes', async () => {
+    vi.stubGlobal('ResizeObserver', TestResizeObserver)
+    const { wrapper } = await mountStudyView()
+    const studyStage = wrapper.get('.study-stage')
+    const resizeObserver = studyResizeObserver
+    if (!resizeObserver) throw new Error('Expected the study stage resize observer.')
+
+    expect(studyStage.classes()).toContain('h-60')
+    expect(studyStage.classes()).toContain('sm:aspect-[1.225]')
+    expect(studyStage.classes()).toContain('sm:h-auto')
+    expect(wrapper.get('.study-cap').attributes('style')).toContain('translateY(-160px)')
+    expect(wrapper.get('.study-face').attributes('style')).toContain('left: 11px')
+
+    Object.defineProperty(studyStage.element, 'clientHeight', {
+      configurable: true,
+      value: 400,
+    })
+    resizeObserver.trigger()
+    await flushPromises()
+
+    expect(wrapper.get('.study-cap').attributes('style')).toContain('translateY(-200px)')
   })
 
   it('shows completion after the last card reaches score ten', async () => {

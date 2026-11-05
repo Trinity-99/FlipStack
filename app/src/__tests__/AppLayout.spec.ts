@@ -75,8 +75,12 @@ describe('AppLayout', () => {
     expect(wrapper.find('header').exists()).toBe(true)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Cards content')
+    expect(wrapper.get('.min-h-dvh > div').classes()).toContain('sm:max-w-[720px]')
     expect(wrapper.get('main').classes()).toContain('px-4')
     expect(wrapper.get('main').classes()).toContain('py-5')
+    expect(wrapper.get('nav[aria-label="Main navigation"] > div').classes()).not.toContain(
+      'max-w-md',
+    )
     expect(wrapper.classes()).toContain('min-h-dvh')
   })
 

@@ -47,6 +47,14 @@ describe('DeckEditView', () => {
     })
   }
 
+  it('uses the available tablet width with responsive title and form padding', () => {
+    const wrapper = mountView()
+
+    expect(wrapper.get('section').classes()).not.toContain('max-w-md')
+    expect(wrapper.get('h1').classes()).toContain('sm:text-3xl')
+    expect(wrapper.get('form').classes()).toContain('sm:p-8')
+  })
+
   it('creates a deck, updates the cache, and opens card creation when requested', async () => {
     mockSuccessfulSave()
     const selectActiveDeck = vi.spyOn(useDeckStore(), 'selectActiveDeck').mockResolvedValue()

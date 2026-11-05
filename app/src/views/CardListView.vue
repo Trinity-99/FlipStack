@@ -85,7 +85,7 @@ function toggleSort(side: CardSide): void {
 <template>
   <section class="flex flex-1 flex-col gap-5" aria-labelledby="card-list-title">
     <div class="flex items-center justify-between gap-4">
-      <h1 id="card-list-title" class="text-2xl font-semibold text-primary">Cards</h1>
+      <h1 id="card-list-title" class="text-2xl font-semibold text-primary sm:text-3xl">Cards</h1>
       <RouterLink
         v-if="deckStore.activeDeck"
         :to="{ name: 'CardCreate' }"
@@ -105,7 +105,7 @@ function toggleSort(side: CardSide): void {
     </p>
 
     <template v-else>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-3">
         <label class="flex min-w-0 flex-col gap-1.5 text-sm text-secondary">
           <span>Filter by tag</span>
           <select
@@ -122,10 +122,7 @@ function toggleSort(side: CardSide): void {
         </label>
       </div>
 
-      <div
-        v-if="visibleCards.length > 0"
-        class="overflow-x-auto rounded-xl border border-slate-700/60 bg-card"
-      >
+      <div v-if="visibleCards.length > 0" class="rounded-xl border border-slate-700/60 bg-card">
         <table class="w-full table-fixed border-collapse text-left">
           <thead class="bg-surface-muted text-sm text-secondary">
             <tr>

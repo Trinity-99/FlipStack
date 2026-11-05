@@ -42,6 +42,11 @@ All inline alert banners, feedback notifications, and state badges follow a stru
   - *Secondary / Supporting Text (Sides 2 & 3):* `text-lg` to `text-xl`, `font-medium`.
   - *UI Labels, Metadata & Counters:* `text-xs` to `text-sm`, `font-normal`.
 
+### Tablet Typography
+- Keep the typography above unchanged below 640px.
+- At 640px and above, use `text-4xl` for the study question prompt and `text-3xl` for revealed answer text.
+- Increase page headings from `text-2xl` to `text-3xl` at 640px and above.
+- These are starting sizes to tune on a real tablet.
 
 ## 1.4 Layout, Elevation & Container Standards
 
@@ -59,6 +64,13 @@ All primary cards, modals, and container elements must adhere to these standardi
 ### Mobile Viewport Frame Rule
 - **Standard Frame Target:** iPhone 12 Mini baseline (`375px × 812px`).
 - **Card Bounds:** Primary floating cards maintain a maximum height constraint (e.g. `h-80` / `20rem` on mobile study viewports) to ensure touch targets for upper/lower swipe gestures remain effortlessly reachable single-handed.
+
+### Tablet Viewport Frame Rule
+- Keep the phone layout unchanged below 640px. At 640px and above, center the app in a single column with a maximum width of 720px; the surrounding area remains the plain app background.
+- Header, page content, and bottom navigation use the same frame width where shown. Immersive study continues to hide the global header and bottom navigation.
+- Cards, forms, and lists fill the available content width. Do not introduce side-by-side page layouts or horizontal scrolling.
+- At 640px and above, enlarge the study card proportionally, starting at an approximate 1.225:1 width-to-height ratio. Increase study spacing and padding by one responsive step while keeping interactive targets at least 44px high.
+- These are starting values to tune on a real tablet.
 
 ### Compact Forms on Narrow Viewports
 - Dense forms may use `p-4` card padding and tighter field spacing below the `sm` breakpoint to reduce unnecessary scrolling on the standard mobile frame. Restore the standard `p-6` padding and roomier spacing at `sm` and above.

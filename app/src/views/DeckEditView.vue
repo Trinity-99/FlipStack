@@ -234,9 +234,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="mx-auto w-full max-w-md" aria-labelledby="deck-edit-title">
+  <section class="mx-auto w-full" aria-labelledby="deck-edit-title">
     <div class="mb-6">
-      <h1 id="deck-edit-title" class="text-2xl font-bold text-primary">
+      <h1 id="deck-edit-title" class="text-2xl font-bold text-primary sm:text-3xl">
         {{ isEditMode ? 'Edit deck' : 'Create a deck' }}
       </h1>
       <p class="mt-2 text-sm text-secondary">
@@ -257,7 +257,7 @@ onUnmounted(() => {
 
     <form
       novalidate
-      class="rounded-card border-2 border-slate-600 bg-card p-6 shadow-2xl"
+      class="rounded-card border-2 border-slate-600 bg-card p-6 shadow-2xl sm:p-8"
       @input="feedback.clearOnEdit"
       @submit.prevent="handleSubmit"
     >

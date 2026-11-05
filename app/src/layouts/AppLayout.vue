@@ -27,7 +27,7 @@ async function retryDeckLoading(): Promise<void> {
 <template>
   <div class="min-h-dvh bg-app">
     <div
-      class="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-app pt-[env(safe-area-inset-top)]"
+      class="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-app pt-[env(safe-area-inset-top)] sm:max-w-[720px]"
     >
       <header
         v-if="!isImmersive"

@@ -71,8 +71,10 @@ describe('CardEditView', () => {
     await wrapper.get('[aria-label="Expand tag selector"]').trigger('click')
     expect(wrapper.text()).toContain('Grammar')
     expect(wrapper.text()).not.toContain('Thai')
+    expect(wrapper.get('section').classes()).not.toContain('max-w-md')
+    expect(wrapper.get('h1').classes()).toContain('sm:text-3xl')
     expect(wrapper.get('form').classes()).toContain('p-4')
-    expect(wrapper.get('form').classes()).toContain('sm:p-6')
+    expect(wrapper.get('form').classes()).toContain('sm:p-8')
     expect(wrapper.get('#card-side-1').attributes('rows')).toBe('2')
     expect(wrapper.get('#card-side-1').classes()).toContain('min-h-16')
   })
@@ -130,9 +132,7 @@ describe('CardEditView', () => {
     await wrapper.get('[aria-label="Add tag"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.get('[role="alert"]').text()).toBe(
-      'Unable to create tag. Please try again.',
-    )
+    expect(wrapper.get('[role="alert"]').text()).toBe('Unable to create tag. Please try again.')
     expect(wrapper.find('#tag-options button[aria-pressed="true"]').exists()).toBe(false)
     expect(wrapper.get('#new-tag-name').element).toHaveProperty('value', 'Nouns')
   })

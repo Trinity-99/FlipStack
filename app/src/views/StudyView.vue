@@ -43,7 +43,6 @@ const SPRING_MS = 680
 const TILT_DEG = 8
 const SLIVER_DEG = 0
 const EDGE_SHADE = 0.14
-const STAGE_HEIGHT_PX = 240 // 15rem, keep in sync with .study-stage height
 
 // Gestures. Horizontal wins; vertical must be clearly vertical.
 const DRAG_START_PX = 8
@@ -66,6 +65,7 @@ const studyService = new StudyService()
 const stageEl = ref<HTMLElement | null>(null)
 const moverEl = ref<HTMLElement | null>(null)
 const stageWidth = ref(0)
+const stageHeight = ref(240)
 const turns = ref(0)
 const dragAngle = ref(0)
 const dragOffsetY = ref(0)
@@ -169,7 +169,7 @@ const prismParts = computed<{ strips: PrismStrip[]; capStyle: Record<string, str
       }
 
       for (let k = 0; k <= segments; k++) {
-        const angle = (((corner + k / segments) * g.stepDeg) * Math.PI) / 180
+        const angle = ((corner + k / segments) * g.stepDeg * Math.PI) / 180
         const x = g.cornerDistance * Math.sin(cornerRad) + g.radius * Math.sin(angle)
         const z = g.cornerDistance * Math.cos(cornerRad) + g.radius * Math.cos(angle)
         outline.push(`${box / 2 + x}px ${box / 2 + z}px`)
@@ -182,7 +182,7 @@ const prismParts = computed<{ strips: PrismStrip[]; capStyle: Record<string, str
         width: `${box}px`,
         height: `${box}px`,
         margin: `${-box / 2}px 0 0 ${-box / 2}px`,
-        transform: `translateY(${-STAGE_HEIGHT_PX / 2}px) rotateX(90deg)`,
+        transform: `translateY(${-stageHeight.value / 2}px) rotateX(90deg)`,
         clipPath: `polygon(${outline.join(',')})`,
       },
     }
@@ -435,17 +435,27 @@ async function initializeActiveSession(): Promise<void> {
   }
 }
 
-// Measure the stage so the prism geometry follows the available width.
+/**
+ * @summary Updates the study stage dimensions used to size its 3D prism.
+ * @param {HTMLElement} element - The study stage element to measure.
+ * @returns {void}
+ */
+function updateStageDimensions(element: HTMLElement): void {
+  stageWidth.value = element.clientWidth
+  stageHeight.value = element.clientHeight
+}
+
+// Measure the stage so the prism geometry follows its responsive dimensions.
 watch(
   stageEl,
   (element) => {
     resizeObserver?.disconnect()
     resizeObserver = null
     if (!element) return
-    stageWidth.value = element.clientWidth
+    updateStageDimensions(element)
     if (typeof ResizeObserver === 'undefined') return
     resizeObserver = new ResizeObserver(() => {
-      stageWidth.value = element.clientWidth
+      updateStageDimensions(element)
     })
     resizeObserver.observe(element)
   },
@@ -476,7 +486,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="flex min-h-full flex-1 flex-col px-4 pb-4 pt-3 sm:px-6">
+  <section class="flex min-h-full flex-1 flex-col px-4 pb-4 pt-3 sm:px-8 sm:pb-6 sm:pt-5">
     <header class="flex min-h-12 items-center justify-between gap-3">
       <button
         type="button"
@@ -520,7 +530,7 @@ onBeforeUnmount(() => {
       class="flex flex-1 items-center justify-center py-6"
     >
       <section
-        class="w-full rounded-3xl border-2 border-slate-600 bg-card p-6 text-center shadow-2xl"
+        class="w-full rounded-3xl border-2 border-slate-600 bg-card p-6 text-center shadow-2xl sm:p-8"
         aria-labelledby="study-complete-title"
       >
         <div
@@ -537,7 +547,7 @@ onBeforeUnmount(() => {
             />
           </svg>
         </div>
-        <h1 id="study-complete-title" class="text-2xl font-semibold text-primary">
+        <h1 id="study-complete-title" class="text-2xl font-semibold text-primary sm:text-3xl">
           Congratulations!
         </h1>
         <p class="mt-3 text-secondary">
@@ -558,7 +568,7 @@ onBeforeUnmount(() => {
 
     <div
       v-else-if="currentCard && currentStep"
-      class="flex flex-1 flex-col justify-center gap-4 py-4"
+      class="flex flex-1 flex-col justify-center gap-4 py-4 sm:gap-6 sm:py-6"
     >
       <div class="flex items-start justify-between gap-3 px-1">
         <div class="min-w-0">
@@ -593,55 +603,57 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="flex flex-1 items-center justify-center">
-      <div
-        ref="stageEl"
-        class="study-stage mx-auto w-[82%] max-w-xs"
-        role="group"
-        aria-label="Study card"
-        aria-describedby="study-card-instructions"
-        tabindex="0"
-        @pointerdown="handlePointerDown"
-        @pointermove="handlePointerMove"
-        @pointerup="handlePointerUp"
-        @pointercancel="handlePointerCancel"
-        @keydown.enter.prevent="turnToNextSide"
-        @keydown.space.prevent="turnToNextSide"
-      >
-        <div ref="moverEl" class="study-layer" :style="moverStyle">
-          <div class="study-layer" :style="{ transform: `rotateX(${TILT_DEG}deg)` }">
-            <div class="study-layer" :style="prismStyle">
-              <div
-                v-for="(step, index) in visibleSteps"
-                :key="step.side"
-                class="study-face"
-                :style="faceStyle(index)"
-                aria-hidden="true"
-              >
-                <span class="study-face-label">{{ sideLabels[index] }}</span>
-                <span
-                  class="max-h-36 overflow-y-auto whitespace-pre-wrap break-words font-semibold leading-relaxed text-primary"
-                  :class="step.role === 'question' ? 'text-3xl' : 'text-2xl'"
+        <div
+          ref="stageEl"
+          class="study-stage mx-auto h-60 w-[82%] max-w-xs sm:aspect-[1.225] sm:h-auto sm:max-w-none"
+          role="group"
+          aria-label="Study card"
+          aria-describedby="study-card-instructions"
+          tabindex="0"
+          @pointerdown="handlePointerDown"
+          @pointermove="handlePointerMove"
+          @pointerup="handlePointerUp"
+          @pointercancel="handlePointerCancel"
+          @keydown.enter.prevent="turnToNextSide"
+          @keydown.space.prevent="turnToNextSide"
+        >
+          <div ref="moverEl" class="study-layer" :style="moverStyle">
+            <div class="study-layer" :style="{ transform: `rotateX(${TILT_DEG}deg)` }">
+              <div class="study-layer" :style="prismStyle">
+                <div
+                  v-for="(step, index) in visibleSteps"
+                  :key="step.side"
+                  class="study-face"
+                  :style="faceStyle(index)"
+                  aria-hidden="true"
                 >
-                  {{ getSideContent(step) }}
-                </span>
+                  <span class="study-face-label">{{ sideLabels[index] }}</span>
+                  <span
+                    class="max-h-36 overflow-y-auto whitespace-pre-wrap break-words font-semibold leading-relaxed text-primary"
+                    :class="
+                      step.role === 'question' ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'
+                    "
+                  >
+                    {{ getSideContent(step) }}
+                  </span>
+                </div>
+                <div
+                  v-for="strip in prismParts.strips"
+                  :key="strip.key"
+                  class="study-strip"
+                  :style="strip.style"
+                  aria-hidden="true"
+                />
+                <div
+                  v-if="prismParts.capStyle"
+                  class="study-cap"
+                  :style="prismParts.capStyle"
+                  aria-hidden="true"
+                />
               </div>
-              <div
-                v-for="strip in prismParts.strips"
-                :key="strip.key"
-                class="study-strip"
-                :style="strip.style"
-                aria-hidden="true"
-              />
-              <div
-                v-if="prismParts.capStyle"
-                class="study-cap"
-                :style="prismParts.capStyle"
-                aria-hidden="true"
-              />
             </div>
           </div>
         </div>
-      </div>
       </div>
 
       <p id="study-card-instructions" class="sr-only">
@@ -735,7 +747,6 @@ onBeforeUnmount(() => {
 /* Surface colours below are the design tokens: bg-card #1E293B, border slate-600 #475569, text-secondary #94A3B8. */
 .study-stage {
   position: relative;
-  height: 15rem;
   perspective: 1100px;
   touch-action: none;
   user-select: none;
@@ -800,6 +811,16 @@ onBeforeUnmount(() => {
   text-align: center;
   font-size: 0.875rem;
   color: #94a3b8;
+}
+
+@media (min-width: 640px) {
+  .study-face {
+    padding: 2rem;
+  }
+
+  .study-face-label {
+    top: 1.5rem;
+  }
 }
 
 .study-cap {
