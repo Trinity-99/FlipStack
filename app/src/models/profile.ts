@@ -125,6 +125,52 @@ export class Profile {
   }
 
   /**
+   * @summary Creates an account without authenticating the current application session.
+   * @param {string} email - The validated email address.
+   * @param {string} password - The validated password.
+   * @param {string} emailRedirectTo - The application callback URL.
+   * @returns {Promise<void>} A promise that resolves when the confirmation email is requested.
+   * @throws {AuthenticationError} If Supabase rejects or cannot complete signup.
+   */
+  public static async signUp(
+    email: string,
+    password: string,
+    emailRedirectTo: string,
+  ): Promise<void> {
+    if (!email.trim() || !password || !emailRedirectTo.trim()) {
+      throw new Error('Email, password, and confirmation URL are required to sign up.')
+    }
+
+    try {
+      await dataRouter.signUp({ email: email.trim(), password }, emailRedirectTo)
+    } catch (error: unknown) {
+      console.error('Profile.signUp failed:', error)
+      if (error instanceof AuthenticationError) throw error
+      throw new AuthenticationError(
+        error instanceof TypeError ? 'network' : 'unexpected',
+        error instanceof TypeError
+          ? 'Unable to connect to the authentication service.'
+          : 'Unable to create your account.',
+        error,
+      )
+    }
+  }
+
+  /**
+   * @summary Completes and clears a confirmed email callback session.
+   * @returns {Promise<void>} A promise that resolves when the confirmation is verified.
+   * @throws {AuthenticationError} If the callback is invalid, expired, or cannot be verified.
+   */
+  public static async completeEmailConfirmation(): Promise<void> {
+    try {
+      await dataRouter.completeEmailConfirmation()
+    } catch (error: unknown) {
+      console.error('Profile.completeEmailConfirmation failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * @summary Authenticates a user and loads their database-backed profile.
    * @param {string} email - The user's email address.
    * @param {string} password - The user's password.
@@ -184,8 +230,7 @@ export class Profile {
       if (error) {
         const isNetworkFailure =
           error instanceof TypeError ||
-          (error instanceof Error &&
-            ['AuthRetryableFetchError', 'FetchError'].includes(error.name))
+          (error instanceof Error && ['AuthRetryableFetchError', 'FetchError'].includes(error.name))
         const ownerId = await dataRouter.getLocalOwnerUserId()
         const localProfile = ownerId ? await Profile.findById(ownerId) : null
         if (isNetworkFailure && localProfile) {

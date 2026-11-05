@@ -137,6 +137,27 @@ describe('DataRouter', () => {
     ).resolves.toMatchObject({ counter: 3 })
   })
 
+  it('proxies signup and email-confirmation processing through RemoteSource', async () => {
+    const remoteSource = new FakeRemoteSource()
+    const signUp = vi.spyOn(remoteSource, 'signUp').mockResolvedValue()
+    const completeEmailConfirmation = vi
+      .spyOn(remoteSource, 'completeEmailConfirmation')
+      .mockResolvedValue()
+    const router = new DataRouter(localSource, remoteSource)
+
+    await router.signUp(
+      { email: 'user@example.com', password: 'valid-password' },
+      'https://app.test/auth/confirm',
+    )
+    await router.completeEmailConfirmation()
+
+    expect(signUp).toHaveBeenCalledWith(
+      { email: 'user@example.com', password: 'valid-password' },
+      'https://app.test/auth/confirm',
+    )
+    expect(completeEmailConfirmation).toHaveBeenCalledOnce()
+  })
+
   it('preserves the local mirror for the same user and clears it for a different user', async () => {
     const router = new DataRouter(localSource, new FakeRemoteSource())
     await localSource.setOwnerUserId('user-1')

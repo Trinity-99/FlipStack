@@ -53,6 +53,26 @@ describe('startup router guard', () => {
     expect(Profile.restoreAuthentication).toHaveBeenCalledOnce()
   })
 
+  it('allows the email-confirmation callback without restoring an existing session first', async () => {
+    const restoreAuthentication = vi.mocked(Profile.restoreAuthentication)
+    restoreAuthentication.mockClear()
+    useAuthStore().hasRestoredAuthentication = false
+
+    await router.push('/auth/confirm')
+
+    expect(router.currentRoute.value.name).toBe('EmailConfirmation')
+    expect(restoreAuthentication).not.toHaveBeenCalled()
+  })
+
+  it('allows an unauthenticated user to open signup without loading private app data', async () => {
+    const findAllForUser = vi.mocked(Deck.findAllForUser)
+
+    await router.push('/signup')
+
+    expect(router.currentRoute.value.name).toBe('SignUp')
+    expect(findAllForUser).not.toHaveBeenCalled()
+  })
+
   it('keeps auth restoration failures on the login route with an error state', async () => {
     vi.mocked(Profile.restoreAuthentication).mockRejectedValue(new Error('Restore failed'))
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -73,6 +93,14 @@ describe('startup router guard', () => {
 
     expect(router.currentRoute.value.name).toBe('DeckCreate')
     expect(Deck.findAllForUser).toHaveBeenCalledWith('user-1')
+  })
+
+  it('routes an authenticated user away from signup to onboarding', async () => {
+    authenticate()
+
+    await router.push('/signup')
+
+    expect(router.currentRoute.value.name).toBe('DeckCreate')
   })
 
   it('routes an authenticated user with an empty active deck to card creation', async () => {

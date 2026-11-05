@@ -450,6 +450,27 @@ export class DataRouter {
   }
 
   /**
+   * @summary Proxies account signup through the remote source.
+   * @param {{ email: string; password: string }} credentials - The validated signup credentials.
+   * @param {string} emailRedirectTo - The application callback URL.
+   * @returns {Promise<void>} A promise that resolves when the signup request completes.
+   */
+  public async signUp(
+    credentials: { email: string; password: string },
+    emailRedirectTo: string,
+  ): Promise<void> {
+    return this.remoteSource.signUp(credentials, emailRedirectTo)
+  }
+
+  /**
+   * @summary Proxies confirmation callback processing through the remote source.
+   * @returns {Promise<void>} A promise that resolves after confirmation cleanup.
+   */
+  public async completeEmailConfirmation(): Promise<void> {
+    return this.remoteSource.completeEmailConfirmation()
+  }
+
+  /**
    * @summary Proxies persisted-session restoration through the remote source.
    * @returns {Promise<Awaited<ReturnType<RemoteSource['getSession']>>>} Session result.
    */

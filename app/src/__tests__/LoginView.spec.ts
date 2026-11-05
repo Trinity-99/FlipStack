@@ -7,13 +7,17 @@ import type { AuthenticationResult } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
 import LoginView from '@/views/LoginView.vue'
 
-const { replaceRoute } = vi.hoisted(() => ({ replaceRoute: vi.fn<() => Promise<void>>() }))
+const { replaceRoute, routeState } = vi.hoisted(() => ({
+  replaceRoute: vi.fn<() => Promise<void>>(),
+  routeState: { query: {} as Record<string, string | null | (string | null)[]> },
+}))
 
 vi.mock('vue-router', async (importOriginal) => {
   const routerModule = await importOriginal<typeof import('vue-router')>()
   return {
     ...routerModule,
     useRouter: () => ({ replace: replaceRoute }),
+    useRoute: () => routeState,
   }
 })
 
@@ -37,6 +41,7 @@ const authenticationResult: AuthenticationResult = { profile, session }
 describe('LoginView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    routeState.query = {}
   })
 
   afterEach(() => {
@@ -47,7 +52,12 @@ describe('LoginView', () => {
   function mountLoginView() {
     const pinia = createPinia()
     setActivePinia(pinia)
-    return mount(LoginView, { global: { plugins: [pinia] } })
+    return mount(LoginView, {
+      global: {
+        plugins: [pinia],
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
   }
 
   async function fillValidCredentials(wrapper: ReturnType<typeof mountLoginView>): Promise<void> {
@@ -75,6 +85,20 @@ describe('LoginView', () => {
     expect(wrapper.get('[role="status"]').text()).toContain(
       'the session could not be revoked online',
     )
+  })
+
+  it('offers signup and consumes the email-confirmation message once', async () => {
+    routeState.query = { emailConfirmed: 'true', keep: 'value' }
+    const wrapper = mountLoginView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No account yet?')
+    expect(wrapper.text()).toContain('Sign up')
+    expect(wrapper.get('[role="status"]').text()).toBe('Email confirmed, please log in.')
+    expect(replaceRoute).toHaveBeenCalledWith({
+      name: 'Login',
+      query: { keep: 'value' },
+    })
   })
 
   it.each([

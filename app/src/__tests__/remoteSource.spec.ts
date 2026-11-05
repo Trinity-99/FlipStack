@@ -1,24 +1,93 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RemoteSource } from '@/data/remoteSource'
 
-const { authGetSession, authSignOut } = vi.hoisted(() => ({
+const { authGetSession, authSignOut, authSignUp } = vi.hoisted(() => ({
   authGetSession: vi.fn<() => Promise<unknown>>(),
   authSignOut: vi.fn<(options: { scope: 'local' }) => Promise<unknown>>(),
+  authSignUp:
+    vi.fn<
+      (credentials: {
+        email: string
+        password: string
+        options: { emailRedirectTo: string }
+      }) => Promise<unknown>
+    >(),
 }))
 
 vi.mock('@/db/supabase', () => ({
   supabase: {
-    auth: { getSession: authGetSession, signOut: authSignOut },
+    auth: { getSession: authGetSession, signOut: authSignOut, signUp: authSignUp },
   },
 }))
 
-describe('RemoteSource sign-out', () => {
+describe('RemoteSource authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('creates an account with the email-confirmation callback URL', async () => {
+    authSignUp.mockResolvedValue({ data: { user: { id: 'user-1' }, session: null }, error: null })
+    const source = new RemoteSource()
+
+    await expect(
+      source.signUp(
+        { email: 'user@example.com', password: 'valid-password' },
+        'https://app.test/auth/confirm',
+      ),
+    ).resolves.toBeUndefined()
+
+    expect(authSignUp).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      password: 'valid-password',
+      options: { emailRedirectTo: 'https://app.test/auth/confirm' },
+    })
+  })
+
+  it('categorizes signup transport failures', async () => {
+    authSignUp.mockRejectedValue(new TypeError('Failed to fetch'))
+    const source = new RemoteSource()
+
+    await expect(
+      source.signUp(
+        { email: 'user@example.com', password: 'valid-password' },
+        'https://app.test/auth/confirm',
+      ),
+    ).rejects.toMatchObject({ name: 'AuthenticationError', kind: 'network' })
+  })
+
+  it('confirms a verified email callback and clears the local session', async () => {
+    authGetSession.mockResolvedValue({
+      data: {
+        session: {
+          user: { email_confirmed_at: '2026-01-01T00:00:00.000Z' },
+        },
+      },
+      error: null,
+    })
+    authSignOut.mockResolvedValue({ error: null })
+    const source = new RemoteSource()
+
+    await expect(source.completeEmailConfirmation()).resolves.toBeUndefined()
+
+    expect(authSignOut).toHaveBeenCalledWith({ scope: 'local' })
+  })
+
+  it('rejects confirmation callbacks without a confirmed session', async () => {
+    authGetSession.mockResolvedValue({
+      data: { session: { user: { email_confirmed_at: null } } },
+      error: null,
+    })
+    const source = new RemoteSource()
+
+    await expect(source.completeEmailConfirmation()).rejects.toMatchObject({
+      name: 'AuthenticationError',
+      message: 'The confirmation link is invalid or has expired.',
+    })
+    expect(authSignOut).not.toHaveBeenCalled()
   })
 
   it('clears only the local Supabase session', async () => {

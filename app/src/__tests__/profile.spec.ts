@@ -115,6 +115,37 @@ describe('Profile authentication', () => {
     expect(dataRouter.signOut).toHaveBeenCalledOnce()
   })
 
+  it('validates and delegates account signup', async () => {
+    const signUp = vi.spyOn(dataRouter, 'signUp').mockResolvedValue()
+    const prepareAuthenticatedUser = vi.spyOn(dataRouter, 'prepareAuthenticatedUser')
+
+    await Profile.signUp(' user@example.com ', 'valid-password', 'https://app.test/auth/confirm')
+
+    expect(signUp).toHaveBeenCalledWith(
+      { email: 'user@example.com', password: 'valid-password' },
+      'https://app.test/auth/confirm',
+    )
+    expect(prepareAuthenticatedUser).not.toHaveBeenCalled()
+  })
+
+  it('rejects invalid signup inputs before calling DataRouter', async () => {
+    const signUp = vi.spyOn(dataRouter, 'signUp')
+
+    await expect(
+      Profile.signUp(' ', 'valid-password', 'https://app.test/auth/confirm'),
+    ).rejects.toThrow('Email, password, and confirmation URL are required to sign up.')
+    expect(signUp).not.toHaveBeenCalled()
+  })
+
+  it('delegates email-confirmation callback processing to DataRouter', async () => {
+    const completeEmailConfirmation = vi
+      .spyOn(dataRouter, 'completeEmailConfirmation')
+      .mockResolvedValue()
+
+    await expect(Profile.completeEmailConfirmation()).resolves.toBeUndefined()
+    expect(completeEmailConfirmation).toHaveBeenCalledOnce()
+  })
+
   it('maps Supabase invalid-credential errors', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     authSignIn.mockResolvedValue({

@@ -112,6 +112,70 @@ export class RemoteSource {
   }
 
   /**
+   * @summary Creates an account and requests an email confirmation.
+   * @param {Credentials} credentials - The validated signup credentials.
+   * @param {string} emailRedirectTo - The application callback URL for confirmation.
+   * @returns {Promise<void>} A promise that resolves when Supabase accepts the signup request.
+   * @throws {AuthenticationError} If Supabase rejects or cannot complete signup.
+   */
+  public async signUp(credentials: Credentials, emailRedirectTo: string): Promise<void> {
+    try {
+      const { error } = await supabase.auth.signUp({
+        ...credentials,
+        options: { emailRedirectTo },
+      })
+      if (error) {
+        const kind = this.isNetworkError(error) ? 'network' : 'unexpected'
+        throw new AuthenticationError(
+          kind,
+          kind === 'network'
+            ? 'Unable to connect to the authentication service.'
+            : 'Supabase could not create the account.',
+          error,
+        )
+      }
+    } catch (error: unknown) {
+      if (error instanceof AuthenticationError) throw error
+      const kind = this.isNetworkError(error) ? 'network' : 'unexpected'
+      throw new AuthenticationError(
+        kind,
+        kind === 'network'
+          ? 'Unable to connect to the authentication service.'
+          : 'Supabase signup failed.',
+        error,
+      )
+    }
+  }
+
+  /**
+   * @summary Validates the email-confirmation session and clears it on this device.
+   * @returns {Promise<void>} A promise that resolves after confirmation and local cleanup.
+   * @throws {AuthenticationError} If no confirmed callback session is available.
+   */
+  public async completeEmailConfirmation(): Promise<void> {
+    const { data, error } = await this.getSession()
+    if (error) {
+      const kind = this.isNetworkError(error) ? 'network' : 'unexpected'
+      throw new AuthenticationError(
+        kind,
+        kind === 'network'
+          ? 'Unable to connect to the authentication service.'
+          : 'Unable to verify the confirmation link.',
+        error,
+      )
+    }
+
+    if (!data.session?.user.email_confirmed_at) {
+      throw new AuthenticationError(
+        'unexpected',
+        'The confirmation link is invalid or has expired.',
+      )
+    }
+
+    await this.signOut()
+  }
+
+  /**
    * @summary Restores the persisted Supabase session.
    * @returns {Promise<Awaited<ReturnType<typeof supabase.auth.getSession>>>} The current session result.
    */

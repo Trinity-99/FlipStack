@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { AuthenticationError, Profile } from '@/models/profile'
 import type { AuthenticationResult } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
@@ -12,10 +12,30 @@ const NETWORK_ERROR_MESSAGE =
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const email = ref('')
 const password = ref('')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const emailConfirmationMessage = ref('')
+
+/**
+ * @summary Shows and consumes the one-time email-confirmation route message.
+ * @returns {Promise<void>} A promise that resolves after the route query is cleared.
+ */
+async function consumeEmailConfirmationMessage(): Promise<void> {
+  if (route.query.emailConfirmed !== 'true') return
+
+  emailConfirmationMessage.value = 'Email confirmed, please log in.'
+  const query = { ...route.query }
+  delete query.emailConfirmed
+  try {
+    await router.replace({ name: 'Login', query })
+  } catch (error: unknown) {
+    console.error('Login could not clear the email-confirmation message:', error)
+    errorMessage.value = 'Email confirmed. Please log in.'
+  }
+}
 
 /**
  * @summary Validates the login form before a network request is made.
@@ -82,6 +102,10 @@ async function handleSubmit(): Promise<void> {
     isSubmitting.value = false
   }
 }
+
+onMounted(() => {
+  void consumeEmailConfirmationMessage()
+})
 </script>
 
 <template>
@@ -114,6 +138,15 @@ async function handleSubmit(): Promise<void> {
         aria-live="polite"
       >
         {{ authStore.logoutWarning }}
+      </div>
+
+      <div
+        v-if="emailConfirmationMessage"
+        class="mb-6 rounded-xl border border-emerald-500/50 bg-emerald-950/90 px-4 py-3 text-sm text-emerald-300"
+        role="status"
+        aria-live="polite"
+      >
+        {{ emailConfirmationMessage }}
       </div>
 
       <form novalidate class="space-y-5" @submit.prevent="handleSubmit">
@@ -172,6 +205,16 @@ async function handleSubmit(): Promise<void> {
           <span>{{ isSubmitting ? 'Signing in…' : 'Sign In' }}</span>
         </button>
       </form>
+
+      <p class="mt-6 text-center text-sm text-secondary">
+        No account yet?
+        <RouterLink
+          :to="{ name: 'SignUp' }"
+          class="font-semibold text-indigo-300 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+        >
+          Sign up
+        </RouterLink>
+      </p>
     </section>
   </main>
 </template>

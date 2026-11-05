@@ -13,6 +13,16 @@ const routes: RouteRecordRaw[] = [
     alias: '/login',
   },
   {
+    path: '/signup',
+    name: 'SignUp',
+    component: () => import('@/views/SignUpView.vue'),
+  },
+  {
+    path: '/auth/confirm',
+    name: 'EmailConfirmation',
+    component: () => import('@/views/EmailConfirmationView.vue'),
+  },
+  {
     path: '/app',
     name: 'AppLayout',
     component: () => import('@/layouts/AppLayout.vue'),
@@ -98,6 +108,8 @@ function getRequiredOnboardingRoute(): { name: 'DeckCreate' | 'CardCreate' } | n
 async function resolveStartupRoute(to: RouteLocationNormalized): Promise<RouteLocationRaw | true> {
   const authStore = useAuthStore()
   const deckStore = useDeckStore()
+  if (to.name === 'EmailConfirmation') return true
+
   const requiresAuthentication = to.matched.some(
     (routeRecord) => routeRecord.meta.requiresAuth === true,
   )
@@ -116,7 +128,7 @@ async function resolveStartupRoute(to: RouteLocationNormalized): Promise<RouteLo
 
   if (to.name === 'Test') return true
 
-  const isStartupEntry = to.name === 'Login'
+  const isStartupEntry = to.name === 'Login' || to.name === 'SignUp'
   if (!requiresAuthentication && !isStartupEntry) return true
 
   const profile = authStore.profile
