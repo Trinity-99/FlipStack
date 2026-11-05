@@ -107,6 +107,15 @@ async function handleSubmit(): Promise<void> {
         {{ errorMessage || authStore.initializationError }}
       </div>
 
+      <div
+        v-if="authStore.logoutWarning"
+        class="mb-6 rounded-xl border border-amber-800/60 bg-amber-950 px-4 py-3 text-sm text-amber-300"
+        role="status"
+        aria-live="polite"
+      >
+        {{ authStore.logoutWarning }}
+      </div>
+
       <form novalidate class="space-y-5" @submit.prevent="handleSubmit">
         <div>
           <label for="email" class="mb-2 block text-sm font-medium text-primary">Email</label>

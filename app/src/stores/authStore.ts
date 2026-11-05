@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   const profile = shallowRef<Profile | null>(null)
   const session = shallowRef<Session | null>(null)
   const initializationError = shallowRef<string | null>(null)
+  const logoutWarning = shallowRef<string | null>(null)
   const isAuthenticated = computed(() => profile.value !== null)
   const isRestoring = shallowRef(false)
   const hasRestoredAuthentication = shallowRef(false)
@@ -63,7 +64,31 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = authenticatedProfile
     session.value = authenticatedSession
     initializationError.value = null
+    logoutWarning.value = null
     hasRestoredAuthentication.value = true
+  }
+
+  /**
+   * @summary Clears in-memory authentication while retaining local user data.
+   * @returns {void}
+   */
+  function clearAuthentication(): void {
+    profile.value = null
+    session.value = null
+    hasRestoredAuthentication.value = true
+  }
+
+  /**
+   * @summary Signs out this device and records a warning if server revocation is pending.
+   * @returns {Promise<void>} A promise that resolves after local sign-out completes.
+   * @throws {Error} If the local authentication session could not be cleared.
+   */
+  async function logout(): Promise<void> {
+    const result = await Profile.signOut()
+    clearAuthentication()
+    logoutWarning.value = result.remoteRevocationPending
+      ? 'You are signed out on this device, but the session could not be revoked online.'
+      : null
   }
 
   /**
@@ -88,11 +113,13 @@ export const useAuthStore = defineStore('auth', () => {
     profile,
     session,
     initializationError,
+    logoutWarning,
     isAuthenticated,
     isRestoring,
     hasRestoredAuthentication,
     restoreAuthentication,
     setAuthenticated,
+    logout,
     setProfile,
     retryAuthentication,
   }

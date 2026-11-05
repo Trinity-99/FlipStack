@@ -111,6 +111,20 @@ export class Profile {
   }
 
   /**
+   * @summary Signs out the current device without clearing its local data.
+   * @returns {Promise<{ remoteRevocationPending: boolean }>} Whether server revocation is pending.
+   * @throws {Error} If the local authentication session could not be cleared.
+   */
+  public static async signOut(): Promise<{ remoteRevocationPending: boolean }> {
+    try {
+      return await dataRouter.signOut()
+    } catch (error: unknown) {
+      console.error('Profile.signOut failed:', error)
+      throw error
+    }
+  }
+
+  /**
    * @summary Authenticates a user and loads their database-backed profile.
    * @param {string} email - The user's email address.
    * @param {string} password - The user's password.

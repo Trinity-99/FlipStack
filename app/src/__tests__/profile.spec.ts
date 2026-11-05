@@ -107,6 +107,14 @@ describe('Profile authentication', () => {
     expect(profileFrom).not.toHaveBeenCalled()
   })
 
+  it('delegates sign-out to DataRouter', async () => {
+    vi.spyOn(dataRouter, 'signOut').mockResolvedValue({ remoteRevocationPending: true })
+
+    await expect(Profile.signOut()).resolves.toEqual({ remoteRevocationPending: true })
+
+    expect(dataRouter.signOut).toHaveBeenCalledOnce()
+  })
+
   it('maps Supabase invalid-credential errors', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     authSignIn.mockResolvedValue({

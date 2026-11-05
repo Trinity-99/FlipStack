@@ -66,6 +66,17 @@ describe('LoginView', () => {
     expect(wrapper.get('button[type="submit"]').text()).toContain('Sign In')
   })
 
+  it('announces when remote session revocation is pending', async () => {
+    const wrapper = mountLoginView()
+    useAuthStore().logoutWarning =
+      'You are signed out on this device, but the session could not be revoked online.'
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toContain(
+      'the session could not be revoked online',
+    )
+  })
+
   it.each([
     ['', '', 'Please enter both email and password.'],
     ['invalid-email', 'secret-password', 'Please enter a valid email address.'],

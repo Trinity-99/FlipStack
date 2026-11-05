@@ -170,4 +170,34 @@ describe('startup router guard', () => {
     expect(router.currentRoute.value.name).toBe('SessionStart')
     expect(Deck.findAllForUser).toHaveBeenCalledOnce()
   })
+
+  it('keeps protected routes inaccessible after logout', async () => {
+    const authStore = useAuthStore()
+    vi.mocked(Deck.findAllForUser).mockResolvedValue([deck])
+    vi.mocked(Card.findAllForDeck).mockResolvedValue([
+      new Card(
+        'card-1',
+        'deck-1',
+        'user-1',
+        { s1: 'Term', s2: 'Meaning' },
+        [],
+        createdAt,
+        createdAt,
+      ),
+    ])
+    authenticate()
+    vi.spyOn(Profile, 'signOut').mockResolvedValue({ remoteRevocationPending: false })
+
+    await router.push('/cards')
+    await router.push('/study')
+    await authStore.logout()
+    await router.replace({ name: 'Login' })
+    router.back()
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('Login')
+    })
+
+    expect(authStore.isAuthenticated).toBe(false)
+    expect(authStore.hasRestoredAuthentication).toBe(true)
+  })
 })

@@ -42,8 +42,13 @@ class FakeRemoteSource extends RemoteSource {
   public globalData = globalData
   public deckData = deckData
   public failDeckDownload = false
+  public remoteRevocationPending = false
   public lastSignal: AbortSignal | undefined
   public beforeProgressUpsert: (() => Promise<void>) | null = null
+
+  public override async signOut(): Promise<{ remoteRevocationPending: boolean }> {
+    return { remoteRevocationPending: this.remoteRevocationPending }
+  }
 
   public override async findProgressForUser(
     _userId: string,
@@ -111,6 +116,48 @@ describe('DataRouter', () => {
       localSource.findProgressForUserCardAndDirection('user-1', 'card-1', 'direction-1'),
     ).resolves.toMatchObject({ id: 'server-progress', counter: 5 })
     expect(await localSource.hasPendingChanges()).toBe(false)
+  })
+
+  it('proxies device sign-out through the remote source without clearing local data', async () => {
+    const remoteSource = new FakeRemoteSource()
+    remoteSource.remoteRevocationPending = true
+    const router = new DataRouter(localSource, remoteSource)
+    await localSource.saveProgress({
+      id: '',
+      user_id: 'user-1',
+      card_id: 'card-1',
+      direction_id: 'direction-1',
+      counter: 3,
+      last_updated: createdAt,
+    })
+
+    await expect(router.signOut()).resolves.toEqual({ remoteRevocationPending: true })
+    await expect(
+      localSource.findProgressForUserCardAndDirection('user-1', 'card-1', 'direction-1'),
+    ).resolves.toMatchObject({ counter: 3 })
+  })
+
+  it('preserves the local mirror for the same user and clears it for a different user', async () => {
+    const router = new DataRouter(localSource, new FakeRemoteSource())
+    await localSource.setOwnerUserId('user-1')
+    await localSource.saveProgress({
+      id: '',
+      user_id: 'user-1',
+      card_id: 'card-1',
+      direction_id: 'direction-1',
+      counter: 4,
+      last_updated: createdAt,
+    })
+
+    await router.restoreUser('user-1')
+    await expect(
+      localSource.findProgressForUserCardAndDirection('user-1', 'card-1', 'direction-1'),
+    ).resolves.toMatchObject({ counter: 4 })
+
+    await router.restoreUser('user-2')
+    await expect(
+      localSource.findProgressForUserCardAndDirection('user-1', 'card-1', 'direction-1'),
+    ).resolves.toBeNull()
   })
 
   it('keeps the newer remote value without pushing an older local snapshot', async () => {

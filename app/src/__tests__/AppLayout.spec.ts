@@ -11,6 +11,14 @@ import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 import AppLayout from '@/layouts/AppLayout.vue'
 
+const { syncStatus } = vi.hoisted(() => ({
+  syncStatus: { status: { pending: false as boolean }, dotColor: 'green' },
+}))
+
+vi.mock('@/stores/syncStatusStore', () => ({
+  useSyncStatusStore: () => syncStatus,
+}))
+
 const layoutRouter = createRouter({
   history: createWebHistory(),
   routes: [
@@ -50,6 +58,11 @@ const layoutRouter = createRouter({
           name: 'SessionStart',
           component: { template: '<div />' },
         },
+        {
+          path: '/login',
+          name: 'Login',
+          component: { template: '<div>Login content</div>' },
+        },
       ],
     },
   ],
@@ -58,6 +71,7 @@ const layoutRouter = createRouter({
 describe('AppLayout', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
+    syncStatus.status.pending = false
     vi.spyOn(Deck, 'findAllForUser').mockResolvedValue([])
     vi.spyOn(Direction, 'findAllForDeck').mockResolvedValue([])
     vi.spyOn(Tag, 'findAllForDeck').mockResolvedValue([])
@@ -145,5 +159,60 @@ describe('AppLayout', () => {
 
     expect(findAllForUser).not.toHaveBeenCalled()
     expect(initialize).not.toHaveBeenCalled()
+  })
+
+  it('immediately signs out and replaces the route when there are no pending changes', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const authStore = useAuthStore(pinia)
+    authStore.setAuthenticated(new Profile('user-1', new Date(), new Date()), null)
+    const logout = vi.spyOn(authStore, 'logout').mockResolvedValue()
+    const wrapper = mount(AppLayout, { global: { plugins: [pinia, layoutRouter] } })
+
+    await wrapper.get('button[aria-label="Log out"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(logout).toHaveBeenCalledOnce()
+    expect(layoutRouter.currentRoute.value.name).toBe('Login')
+  })
+
+  it('allows cancelling the pending-changes logout confirmation', async () => {
+    syncStatus.status.pending = true
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const authStore = useAuthStore(pinia)
+    authStore.setAuthenticated(new Profile('user-1', new Date(), new Date()), null)
+    const logout = vi.spyOn(authStore, 'logout').mockResolvedValue()
+    const wrapper = mount(AppLayout, { global: { plugins: [pinia, layoutRouter] } })
+
+    await wrapper.get('button[aria-label="Log out"]').trigger('click')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Some changes have not been saved')
+    await wrapper.get('[role="dialog"] button').trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(logout).not.toHaveBeenCalled()
+    expect(layoutRouter.currentRoute.value.name).toBe('LayoutCards')
+  })
+
+  it('confirms logout with pending changes and surfaces logout failures', async () => {
+    syncStatus.status.pending = true
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const authStore = useAuthStore(pinia)
+    authStore.setAuthenticated(new Profile('user-1', new Date(), new Date()), null)
+    const logout = vi.spyOn(authStore, 'logout').mockRejectedValue(new Error('Sign-out failed'))
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const wrapper = mount(AppLayout, { global: { plugins: [pinia, layoutRouter] } })
+
+    await wrapper.get('button[aria-label="Log out"]').trigger('click')
+    await wrapper.get('[role="dialog"] button:last-child').trigger('click')
+    await flushPromises()
+
+    expect(logout).toHaveBeenCalledOnce()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    expect(wrapper.get('[role="alert"]').text()).toContain('Unable to log out')
+    expect(layoutRouter.currentRoute.value.name).toBe('LayoutCards')
   })
 })

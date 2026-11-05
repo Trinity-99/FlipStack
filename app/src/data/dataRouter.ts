@@ -458,6 +458,14 @@ export class DataRouter {
   }
 
   /**
+   * @summary Proxies local-session sign-out through the remote source.
+   * @returns {Promise<{ remoteRevocationPending: boolean }>} Whether remote revocation failed.
+   */
+  public async signOut(): Promise<Awaited<ReturnType<RemoteSource['signOut']>>> {
+    return this.remoteSource.signOut()
+  }
+
+  /**
    * @summary Pushes pending progress and settings changes.
    * @param {AbortSignal} [signal] - Optional cancellation signal for bounded sync operations.
    * @returns {Promise<void>} A promise that resolves after pending work is processed.

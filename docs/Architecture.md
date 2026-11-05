@@ -162,7 +162,7 @@ All controls below are defined in `createDatabase.sql`.
 
 **Offline data**
 
-- The local database (IndexedDB) belongs to one user. It is cleared on logout and when a different user signs in. An expired session does not clear it.
+- The local database (IndexedDB) belongs to one user. It is not cleared on logout, but when a different user signs in. An expired session does not clear it.
 - Local data reaches Supabase only through the data router and the authenticated Supabase client, so Row-Level Security always applies. 
 
 **Service worker**

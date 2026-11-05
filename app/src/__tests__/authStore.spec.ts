@@ -122,4 +122,32 @@ describe('useAuthStore', () => {
 
     expect(restoreAuthentication).toHaveBeenCalledTimes(1)
   })
+
+  it('clears authentication after successful local logout and retains the revocation warning', async () => {
+    const store = useAuthStore()
+    store.setAuthenticated(new Profile('user-1', new Date(), new Date()), session)
+    const signOut = vi
+      .spyOn(Profile, 'signOut')
+      .mockResolvedValue({ remoteRevocationPending: true })
+
+    await store.logout()
+
+    expect(signOut).toHaveBeenCalledOnce()
+    expect(store.profile).toBeNull()
+    expect(store.session).toBeNull()
+    expect(store.isAuthenticated).toBe(false)
+    expect(store.hasRestoredAuthentication).toBe(true)
+    expect(store.logoutWarning).toContain('could not be revoked online')
+  })
+
+  it('keeps authentication when local logout fails', async () => {
+    const store = useAuthStore()
+    store.setAuthenticated(new Profile('user-1', new Date(), new Date()), session)
+    vi.spyOn(Profile, 'signOut').mockRejectedValue(new Error('Sign-out failed'))
+
+    await expect(store.logout()).rejects.toThrow('Sign-out failed')
+
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.session).toBe(session)
+  })
 })

@@ -120,6 +120,41 @@ export class RemoteSource {
   }
 
   /**
+   * @summary Signs out the local session while treating remote revocation as best-effort.
+   * @returns {Promise<{ remoteRevocationPending: boolean }>} Whether remote revocation failed.
+   * @throws {Error} If the local session could not be confirmed as removed.
+   */
+  public async signOut(): Promise<{ remoteRevocationPending: boolean }> {
+    let remoteError: unknown
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (!error) return { remoteRevocationPending: false }
+      remoteError = error
+    } catch (error: unknown) {
+      remoteError = error
+    }
+
+    try {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        throw new Error('Unable to verify that the local authentication session was cleared.')
+      }
+      if (data.session) {
+        throw new Error('The local authentication session could not be cleared.')
+      }
+    } catch (error: unknown) {
+      console.error('RemoteSource.signOut could not confirm local sign-out:', error)
+      throw error
+    }
+
+    console.warn(
+      'RemoteSource.signOut cleared the local session, but remote revocation failed:',
+      remoteError,
+    )
+    return { remoteRevocationPending: true }
+  }
+
+  /**
    * @summary Saves a deck remotely and returns its server row.
    * @param {DeckInput} row - The validated deck data.
    * @returns {Promise<DeckRow>} The saved server row.
@@ -155,9 +190,9 @@ export class RemoteSource {
     if (row.tag_ids.length > 0) {
       try {
         await this.run('RemoteSource.saveCard.insertTagLinks', async () => {
-          const { error } = await supabase.from('card_tag').insert(
-            row.tag_ids.map((tagId) => ({ card_id: savedCard.id, tag_id: tagId })),
-          )
+          const { error } = await supabase
+            .from('card_tag')
+            .insert(row.tag_ids.map((tagId) => ({ card_id: savedCard.id, tag_id: tagId })))
           if (error) throw error
         })
       } catch (error: unknown) {
@@ -561,8 +596,7 @@ export class RemoteSource {
   private isNetworkError(error: unknown): boolean {
     return (
       error instanceof TypeError ||
-      (error instanceof Error &&
-        ['AuthRetryableFetchError', 'FetchError'].includes(error.name))
+      (error instanceof Error && ['AuthRetryableFetchError', 'FetchError'].includes(error.name))
     )
   }
 
