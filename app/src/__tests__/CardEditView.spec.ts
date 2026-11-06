@@ -10,6 +10,7 @@ import CardEditView from '@/views/CardEditView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useDeckStore } from '@/stores/deckStore'
+import { useStudyStore } from '@/stores/studyStore'
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const deck = new Deck(
@@ -26,6 +27,7 @@ const router = createRouter({
     { path: '/cards/new', name: 'CardCreate', component: CardEditView },
     { path: '/cards/edit/:id', name: 'CardEdit', component: CardEditView },
     { path: '/cards', name: 'CardList', component: { template: '<div>Card list</div>' } },
+    { path: '/study', name: 'Study', component: { template: '<div>Study session</div>' } },
   ],
 })
 
@@ -284,6 +286,32 @@ describe('CardEditView', () => {
     expect(existingCard.content.s1).toBe('Updated word')
     expect(upsertCard).toHaveBeenCalledWith(existingCard)
     expect(router.currentRoute.value.name).toBe('CardList')
+  })
+
+  it('returns to the study session after saving an edited study card', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word', s2: 'Sound' },
+      ['tag-1'],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    vi.spyOn(Card.prototype, 'save').mockResolvedValue()
+    const replaceCurrentCard = vi.spyOn(useStudyStore(), 'replaceCurrentCard')
+    await router.push('/study')
+    await router.push('/cards/edit/card-1?returnTo=study')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('#card-side-1').setValue('Corrected word')
+    await clickButton(wrapper, 'Save Changes')
+    await flushPromises()
+
+    expect(replaceCurrentCard).toHaveBeenCalledWith(existingCard)
+    expect(router.currentRoute.value.name).toBe('Study')
   })
 
   it('renders HTML-looking card content as literal textarea text', async () => {

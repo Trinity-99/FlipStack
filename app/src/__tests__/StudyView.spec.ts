@@ -106,6 +106,11 @@ describe('StudyView', () => {
           name: 'SessionStart',
           component: { template: '<p>Session setup</p>' },
         },
+        {
+          path: '/cards/edit/:id',
+          name: 'CardEdit',
+          component: { template: '<p>Edit card</p>' },
+        },
       ],
     })
     await router.push({ name: 'Study' })
@@ -316,6 +321,17 @@ describe('StudyView', () => {
     await wrapper.get('[aria-label="Exit study session"]').trigger('click')
 
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('SessionStart'))
+  })
+
+  it('opens the current card editor from side navigation', async () => {
+    const { wrapper, router } = await mountStudyView()
+
+    await wrapper.get('[aria-label="Edit current card"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('CardEdit')
+    expect(router.currentRoute.value.params.id).toBe(card.id)
+    expect(router.currentRoute.value.query.returnTo).toBe('study')
   })
 
   it('returns to session setup without logging when opened without a prepared session', async () => {

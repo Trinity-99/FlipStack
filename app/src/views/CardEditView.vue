@@ -9,6 +9,7 @@ import type { CardContent } from '@/models/card'
 import { useAuthStore } from '@/stores/authStore'
 import { useCardStore } from '@/stores/cardStore'
 import { useDeckStore } from '@/stores/deckStore'
+import { useStudyStore } from '@/stores/studyStore'
 
 type SaveAction = 'createNext' | 'close' | 'changes'
 type SideKey = keyof CardContent
@@ -20,6 +21,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const cardStore = useCardStore()
 const deckStore = useDeckStore()
+const studyStore = useStudyStore()
 const cardId = computed(() => {
   const routeCardId = route.params.id
   return typeof routeCardId === 'string' ? routeCardId : null
@@ -275,6 +277,12 @@ async function saveCard(action: SaveAction): Promise<void> {
   try {
     await cardToSave.save()
     cardStore.upsertCard(cardToSave)
+
+    if (action === 'changes' && route.query.returnTo === 'study') {
+      studyStore.replaceCurrentCard(cardToSave)
+      await router.replace({ name: 'Study' })
+      return
+    }
 
     if (action === 'createNext') {
       resetForm()

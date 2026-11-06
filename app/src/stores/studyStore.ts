@@ -175,6 +175,33 @@ export const useStudyStore = defineStore('study', () => {
   }
 
   /**
+   * @summary Replaces an edited card in the active study session and its card pools.
+   * @param {Card} card - The persisted card to synchronize.
+   * @returns {void}
+   */
+  function replaceCurrentCard(card: Card): void {
+    const session = activeSession.value
+    if (!session || session.currentCard?.id !== card.id) return
+
+    const replaceInPool = (cards: Card[]): Card[] =>
+      cards.map((sessionCard) => (sessionCard.id === card.id ? card : sessionCard))
+    const updatedPoolSummary = {
+      ...session.poolSummary,
+      eligibleCards: replaceInPool(session.poolSummary.eligibleCards),
+      cardsToLearn: replaceInPool(session.poolSummary.cardsToLearn),
+    }
+
+    activeSession.value = {
+      ...session,
+      cards: replaceInPool(session.cards),
+      currentCard: card,
+      poolSummary: updatedPoolSummary,
+    }
+    poolSummary.value = updatedPoolSummary
+    sessionPool.value = updatedPoolSummary.cardsToLearn
+  }
+
+  /**
    * @summary Resets topic mastery through the Study Engine and publishes the refreshed pool.
    * @param {string | null} tagId - The selected topic, or null for the whole deck.
    * @param {Direction} direction - The selected saved direction.
@@ -211,6 +238,7 @@ export const useStudyStore = defineStore('study', () => {
     startSession,
     startActiveSession,
     rateCurrentCard,
+    replaceCurrentCard,
     resetMastery,
   }
 })

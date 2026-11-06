@@ -99,6 +99,29 @@ describe('useStudyStore', () => {
     expect(store.sessionPool).toEqual([eligibleCard])
   })
 
+  it('replaces an edited current card throughout the active study session', async () => {
+    const store = useStudyStore()
+    await store.startSession(null, direction)
+    store.startActiveSession()
+    const correctedCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'corrected word', s2: 'translation' },
+      ['tag-1'],
+      createdAt,
+      createdAt,
+    )
+
+    store.replaceCurrentCard(correctedCard)
+
+    expect(store.activeSession?.currentCard).toBe(correctedCard)
+    expect(store.activeSession?.cards[0]).toBe(correctedCard)
+    expect(store.activeSession?.poolSummary.cardsToLearn[0]).toBe(correctedCard)
+    expect(store.poolSummary?.cardsToLearn[0]).toBe(correctedCard)
+    expect(store.sessionPool[0]).toBe(correctedCard)
+  })
+
   it('saves a temporary direction and preference only when starting', async () => {
     const temporaryDirection = new Direction(
       null,

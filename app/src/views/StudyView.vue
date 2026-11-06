@@ -273,6 +273,17 @@ function turnToPreviousSide(): void {
   turnToSide('previous')
 }
 
+async function editCurrentCard(): Promise<void> {
+  const cardId = currentCard.value?.id
+  if (!cardId || isRating.value) return
+
+  await router.push({
+    name: 'CardEdit',
+    params: { id: cardId },
+    query: { returnTo: 'study' },
+  })
+}
+
 function settleDrag(): void {
   animateTurn.value = true
   springBack.value = true
@@ -679,6 +690,24 @@ onBeforeUnmount(() => {
               d="M15 18l-6-6 6-6"
               stroke="currentColor"
               stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-surface-muted text-primary transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Edit current card"
+          title="Edit current card"
+          :disabled="isRating || !currentCard?.id"
+          @click="editCurrentCard"
+        >
+          <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M13.5 6.5l4 4M4.5 19.5l4.25-.85L19 8.4a2.83 2.83 0 0 0-4-4L4.75 14.65 4.5 19.5z"
+              stroke="currentColor"
+              stroke-width="1.8"
               stroke-linecap="round"
               stroke-linejoin="round"
             />
