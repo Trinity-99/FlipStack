@@ -258,6 +258,61 @@ describe('CardEditView', () => {
     expect(router.currentRoute.value.name).toBe('CardList')
   })
 
+  it('cancels card creation and returns to the previous view without saving', async () => {
+    const save = vi.spyOn(Card.prototype, 'save')
+    await router.push('/cards')
+    await router.push('/cards/new')
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('#card-side-1').setValue('Unsaved word')
+
+    await clickButton(wrapper, 'Cancel')
+    await flushPromises()
+
+    expect(save).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('CardList')
+  })
+
+  it('cancels card editing and discards changes without saving', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word', s2: 'Sound' },
+      ['tag-1'],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    const save = vi.spyOn(Card.prototype, 'save')
+    await router.push('/cards')
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('#card-side-1').setValue('Unsaved correction')
+
+    await clickButton(wrapper, 'Cancel')
+    await flushPromises()
+
+    expect(save).not.toHaveBeenCalled()
+    expect(existingCard.content.s1).toBe('Word')
+    expect(router.currentRoute.value.name).toBe('CardList')
+  })
+
+  it('returns to the card list when cancelling card creation after deck onboarding', async () => {
+    const save = vi.spyOn(Card.prototype, 'save')
+    await router.push('/cards/new?returnTo=card-list')
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('#card-side-1').setValue('Unsaved word')
+
+    await clickButton(wrapper, 'Cancel')
+    await flushPromises()
+
+    expect(save).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('CardList')
+  })
+
   it('loads, updates, caches, and closes an existing card', async () => {
     const existingCard = new Card(
       'card-1',

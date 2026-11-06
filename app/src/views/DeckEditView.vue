@@ -179,7 +179,7 @@ async function goToAddCards(): Promise<void> {
     }
 
     try {
-      await router.push({ name: 'CardCreate' })
+      await router.push({ name: 'CardCreate', query: { returnTo: 'card-list' } })
     } catch (error: unknown) {
       console.error(`DeckEditView could not open card creation for deck ${deck.id}:`, error)
       feedback.showError(

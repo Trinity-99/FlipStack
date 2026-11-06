@@ -82,6 +82,7 @@ describe('DeckEditView', () => {
 
     expect(selectActiveDeck).toHaveBeenCalledWith('deck-saved')
     expect(router.currentRoute.value.name).toBe('CardCreate')
+    expect(router.currentRoute.value.query.returnTo).toBe('card-list')
   })
 
   it('keeps the user on the editor when activating the saved deck fails', async () => {

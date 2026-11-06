@@ -300,6 +300,26 @@ async function saveCard(action: SaveAction): Promise<void> {
 }
 
 /**
+ * @summary Leaves the editor without persisting the current card form.
+ * @returns {Promise<void>}
+ */
+async function cancelEditing(): Promise<void> {
+  if (isSaving.value || isCreatingTag.value) return
+
+  if (route.query.returnTo === 'card-list') {
+    try {
+      await router.replace({ name: 'CardList' })
+    } catch (error: unknown) {
+      console.error('CardEditView could not return to the card list:', error)
+      feedback.showError('Unable to leave this screen. Please try again.')
+    }
+    return
+  }
+
+  router.back()
+}
+
+/**
  * @summary Clears the card draft and focuses its first side after rendering.
  * @returns {void}
  */
@@ -319,10 +339,18 @@ watch(
 
 <template>
   <section class="mx-auto w-full" aria-labelledby="card-edit-title">
-    <header class="relative mb-4 sm:mb-6">
+    <header class="mb-4 flex items-center justify-between gap-3 sm:mb-6">
       <h1 id="card-edit-title" class="text-2xl font-bold text-primary sm:text-3xl">
         {{ isEditMode ? 'Edit card' : 'Create a card' }}
       </h1>
+      <button
+        type="button"
+        :disabled="isSaving || isCreatingTag"
+        class="min-h-11 shrink-0 rounded-xl border border-border-subtle bg-surface-muted px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+        @click="cancelEditing"
+      >
+        Cancel
+      </button>
     </header>
 
     <FeedbackBanner :message="feedbackMessage" :variant="feedbackVariant" />
