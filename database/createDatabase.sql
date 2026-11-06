@@ -426,3 +426,35 @@ CREATE TRIGGER limit_tag_rows
 CREATE TRIGGER limit_card_tag_rows
     BEFORE INSERT ON public.card_tag
     FOR EACH ROW EXECUTE FUNCTION public.check_row_limit();
+
+-- update us130 - audio
+ALTER TABLE public.deck
+    ADD COLUMN audio_languages JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ADD CONSTRAINT deck_audio_languages_valid CHECK (
+        (
+            jsonb_typeof(audio_languages) = 'object'
+            AND (audio_languages - 's1' - 's2' - 's3') = '{}'::jsonb
+            AND (
+                audio_languages->'s1' IS NULL
+                OR (
+                    jsonb_typeof(audio_languages->'s1') = 'string'
+                    AND char_length(audio_languages->>'s1') > 0
+                )
+            )
+            AND (
+                audio_languages->'s2' IS NULL
+                OR (
+                    jsonb_typeof(audio_languages->'s2') = 'string'
+                    AND char_length(audio_languages->>'s2') > 0
+                )
+            )
+            AND (
+                audio_languages->'s3' IS NULL
+                OR (
+                    jsonb_typeof(audio_languages->'s3') = 'string'
+                    AND char_length(audio_languages->>'s3') > 0
+                    AND jsonb_array_length(side_labels) = 3
+                )
+            )
+        ) IS TRUE
+    );

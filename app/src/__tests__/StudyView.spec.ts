@@ -21,11 +21,11 @@ interface PointerEventOptions {
   timeStamp?: number
 }
 
-let studyResizeObserver: TestResizeObserver | null = null
+let studyResizeObserver: { trigger: () => void } | null = null
 
 class TestResizeObserver implements ResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {
-    studyResizeObserver = this
+    studyResizeObserver = { trigger: () => this.callback([], this) }
   }
 
   observe(target: Element): void {
@@ -39,9 +39,15 @@ class TestResizeObserver implements ResizeObserver {
   unobserve(_target: Element): void {}
 
   disconnect(): void {}
+}
 
-  trigger(): void {
-    this.callback([], this)
+class FakeSpeechSynthesisUtterance {
+  public static instances: FakeSpeechSynthesisUtterance[] = []
+  public lang = ''
+  public voice: SpeechSynthesisVoice | null = null
+
+  constructor(public readonly text: string) {
+    FakeSpeechSynthesisUtterance.instances.push(this)
   }
 }
 
@@ -67,6 +73,16 @@ const card = new Card(
 )
 let pinia: ReturnType<typeof createPinia>
 
+function createSynthesis(getVoices: () => SpeechSynthesisVoice[]) {
+  return {
+    getVoices: vi.fn<() => SpeechSynthesisVoice[]>(getVoices),
+    speak: vi.fn<(utterance: SpeechSynthesisUtterance) => void>(),
+    cancel: vi.fn<() => void>(),
+    addEventListener: vi.fn<(type: string, listener: () => void) => void>(),
+    removeEventListener: vi.fn<(type: string, listener: () => void) => void>(),
+  }
+}
+
 describe('StudyView', () => {
   beforeEach(() => {
     pinia = createPinia()
@@ -82,6 +98,7 @@ describe('StudyView', () => {
     deckStore.activeDeckId = 'deck-1'
     deckStore.directions = [direction]
     deckStore.tags = []
+    deck.audioLanguages = {}
     useCardStore().setCardsForDeck('deck-1', [card])
     vi.spyOn(CardProgress, 'findAllForUserAndDirection').mockResolvedValue([])
   })
@@ -89,6 +106,7 @@ describe('StudyView', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    FakeSpeechSynthesisUtterance.instances = []
     studyResizeObserver = null
   })
 
@@ -149,6 +167,60 @@ describe('StudyView', () => {
 
     await wrapper.get('[aria-label="Previous side"]').trigger('click')
     expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text')
+  })
+
+  it('plays the configured side text without triggering study-card gestures', async () => {
+    const voice = {
+      lang: 'th-TH',
+      localService: true,
+      default: true,
+      name: 'Thai',
+    } as SpeechSynthesisVoice
+    const synthesis = createSynthesis(() => [voice])
+    vi.stubGlobal('speechSynthesis', synthesis)
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeSpeechSynthesisUtterance)
+    deck.audioLanguages = { s1: 'th-TH', s2: 'th-TH' }
+
+    const { wrapper } = await mountStudyView()
+    await flushPromises()
+    const initialAnnouncement = currentSideAnnouncement(wrapper)
+    expect(wrapper.find('.study-stage button').exists()).toBe(false)
+
+    await wrapper.get('[aria-label="Play audio for Prompt"]').trigger('click')
+
+    expect(currentSideAnnouncement(wrapper)).toBe(initialAnnouncement)
+    expect(FakeSpeechSynthesisUtterance.instances[0]?.text).toBe('question text')
+    expect(FakeSpeechSynthesisUtterance.instances[0]?.lang).toBe('th-TH')
+    expect(FakeSpeechSynthesisUtterance.instances[0]?.voice).toBe(voice)
+
+    await wrapper.get('[aria-label="Next side"]').trigger('click')
+    await flushPromises()
+    expect(synthesis.cancel).toHaveBeenCalledOnce()
+
+    await wrapper.get('[aria-label="Play audio for Answer"]').trigger('click')
+    expect(FakeSpeechSynthesisUtterance.instances[1]?.text).toBe('answer text')
+    await wrapper.get('[aria-label="Stop audio for Answer"]').trigger('click')
+    expect(synthesis.cancel).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides the play button when the saved language has no local voice', async () => {
+    vi.stubGlobal(
+      'speechSynthesis',
+      createSynthesis(() => [
+        {
+          lang: 'en-US',
+          localService: true,
+          default: true,
+          name: 'English',
+        } as SpeechSynthesisVoice,
+      ]),
+    )
+    deck.audioLanguages = { s1: 'th-TH' }
+
+    const { wrapper } = await mountStudyView()
+    await flushPromises()
+
+    expect(wrapper.find('[aria-label="Play audio for Prompt"]').exists()).toBe(false)
   })
 
   it('keeps the prism aligned with the stage height when the responsive stage resizes', async () => {

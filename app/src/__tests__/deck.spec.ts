@@ -4,6 +4,7 @@ type DeckPayload = {
   user_id: string
   title: string
   side_labels: string[]
+  audio_languages: Record<string, string>
 }
 
 type SelectQuery = { select: () => SingleQuery }
@@ -56,6 +57,14 @@ describe('Deck', () => {
       'overlong side label',
       new Deck(null, 'user-1', 'Thai', ['x'.repeat(33), 'Meaning'], null, null),
     ],
+    [
+      'invalid audio language',
+      new Deck(null, 'user-1', 'Thai', ['Script', 'Meaning'], null, null, { s1: 'not a locale' }),
+    ],
+    [
+      'audio language for a missing side',
+      new Deck(null, 'user-1', 'Thai', ['Script', 'Meaning'], null, null, { s3: 'th-TH' }),
+    ],
   ])('rejects invalid %s before contacting the database', async (_description, deck) => {
     await expect(deck.save()).rejects.toThrow(/.+/)
 
@@ -82,6 +91,7 @@ describe('Deck', () => {
       null,
       null,
     )
+    deck.audioLanguages = { s1: 'th-TH' }
 
     await deck.save()
 
@@ -90,6 +100,7 @@ describe('Deck', () => {
       user_id: 'user-1',
       title: 'Thai',
       side_labels: sideLabels,
+      audio_languages: { s1: 'th-TH' },
     })
     expect(deck.title).toBe('Thai')
     expect(deck.sideLabels).toEqual(sideLabels)
@@ -118,5 +129,38 @@ describe('Deck', () => {
     expect(() => Deck.fromJSON({ ...validRow, title: 'x'.repeat(33) })).toThrow(
       /Failed to parse Deck from JSON/,
     )
+  })
+
+  it('parses audio languages and defaults missing legacy values to disabled', () => {
+    const row = {
+      id: 'deck-1',
+      user_id: 'user-1',
+      title: 'Thai',
+      side_labels: ['Script', 'Meaning'],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }
+
+    expect(Deck.fromJSON(row).audioLanguages).toEqual({})
+    expect(Deck.fromJSON({ ...row, audio_languages: { s1: 'th-TH' } }).audioLanguages).toEqual({
+      s1: 'th-TH',
+    })
+    expect(() => Deck.fromJSON({ ...row, audio_languages: { s3: 'th-TH' } })).toThrow(
+      /missing side/,
+    )
+    expect(() => Deck.fromJSON({ ...row, audio_languages: { s1: 'invalid code' } })).toThrow(
+      /audio language/,
+    )
+  })
+
+  it('gets, sets, and clears a side audio language', () => {
+    const deck = new Deck('deck-1', 'user-1', 'Thai', ['Script', 'Meaning'], null, null)
+
+    expect(deck.getAudioLanguage(1)).toBeNull()
+    deck.setAudioLanguage(1, 'th-TH')
+    expect(deck.getAudioLanguage(1)).toBe('th-TH')
+
+    deck.clearAudioLanguage(1)
+    expect(deck.getAudioLanguage(1)).toBeNull()
   })
 })

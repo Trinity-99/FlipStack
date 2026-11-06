@@ -32,7 +32,16 @@ describe('DeckEditView', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
+
+  function stubVoices(voices: SpeechSynthesisVoice[]): void {
+    vi.stubGlobal('speechSynthesis', {
+      getVoices: () => voices,
+      addEventListener: vi.fn<(type: string, listener: () => void) => void>(),
+      removeEventListener: vi.fn<(type: string, listener: () => void) => void>(),
+    })
+  }
 
   function mountView() {
     return mount(DeckEditView, {
@@ -129,6 +138,96 @@ describe('DeckEditView', () => {
     await flushPromises()
 
     expect(persistedDecks[0]?.sideLabels).toEqual(['Script', 'Meaning'])
+  })
+
+  it('saves a confirmed language for a side when creating a deck', async () => {
+    stubVoices([
+      { lang: 'th-TH', localService: true, default: true, name: 'Thai' } as SpeechSynthesisVoice,
+    ])
+    const persistedDecks: Deck[] = []
+    vi.spyOn(Deck.prototype, 'save').mockImplementation(async function (this: Deck) {
+      persistedDecks.push(this)
+      Object.assign(this, { id: 'deck-saved' })
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[role="switch"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+    await wrapper.get('#audio-language-select').setValue('th-TH')
+    await wrapper.get('[role="dialog"] form').trigger('submit')
+
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.text()).toContain('th-TH')
+
+    await wrapper.get('#deck-name').setValue('Thai')
+    await wrapper.get('#side-label-1').setValue('Script')
+    await wrapper.get('#side-label-2').setValue('Meaning')
+    await wrapper.get('#side-label-3').setValue('Phonetic')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(persistedDecks[0]?.audioLanguages).toEqual({ s1: 'th-TH' })
+  })
+
+  it('leaves audio off when the language dialog is cancelled without local voices', async () => {
+    stubVoices([])
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[role="switch"]').trigger('click')
+
+    expect(wrapper.get('[role="dialog"]').text()).toContain('No language available')
+    expect(
+      wrapper.find('[role="dialog"] button[type="submit"]').attributes('disabled'),
+    ).toBeDefined()
+    await wrapper.get('[role="dialog"] button[type="button"]').trigger('click')
+
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('false')
+  })
+
+  it('keeps a saved language visible when the current device has no matching voice', async () => {
+    stubVoices([])
+    const deck = new Deck('deck-1', 'user-1', 'Thai', ['Script', 'Meaning'], createdAt, createdAt, {
+      s1: 'th-TH',
+    })
+    vi.spyOn(Deck, 'findById').mockResolvedValue(deck)
+    await router.push('/decks/deck-1/edit')
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('th-TH')
+    await wrapper.get('[aria-label="Change audio language for Script"]').trigger('click')
+    expect(wrapper.get('#audio-language-select option:checked').attributes('value')).toBe('th-TH')
+    expect(wrapper.get('#audio-language-select').text()).toContain('not available on this device')
+
+    await wrapper.get('[role="dialog"] button[type="button"]').trigger('click')
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+  })
+
+  it('switches audio off directly while editing a deck', async () => {
+    const deck = new Deck('deck-1', 'user-1', 'Thai', ['Script', 'Meaning'], createdAt, createdAt, {
+      s1: 'th-TH',
+    })
+    vi.spyOn(Deck, 'findById').mockResolvedValue(deck)
+    let savedAudioLanguages: Deck['audioLanguages'] | undefined
+    vi.spyOn(Deck.prototype, 'save').mockImplementation(async function (this: Deck) {
+      savedAudioLanguages = { ...this.audioLanguages }
+    })
+    await router.push('/decks/deck-1/edit')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[role="switch"]').trigger('click')
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    expect(wrapper.get('[role="switch"]').attributes('aria-checked')).toBe('false')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(savedAudioLanguages).toEqual({})
   })
 
   it('shows the specified title length error before saving', async () => {

@@ -18,11 +18,16 @@ export interface DeckPreferenceRow {
   revision?: number
 }
 
+export type DeckSideKey = 's1' | 's2' | 's3'
+
+export type AudioLanguages = Partial<Record<DeckSideKey, string>>
+
 export interface DeckRow {
   id: string
   user_id: string
   title: string
   side_labels: string[]
+  audio_languages?: AudioLanguages
   created_at: string
   updated_at: string
 }

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AudioLanguageDialog from '@/components/AudioLanguageDialog.vue'
 import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import { useFeedback } from '@/composables/useFeedback'
-import { Deck } from '@/models/deck'
+import { useSpeechSynthesis } from '@/composables/useSpeechSynthesis'
+import { Deck, type DeckSide } from '@/models/deck'
+import type { AudioLanguages, DeckSideKey } from '@/data/dataTypes'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 
@@ -19,11 +22,14 @@ const isEditMode = computed(() => deckId.value !== null)
 const deckName = ref('')
 const sideCount = ref<2 | 3>(3)
 const sideLabels = ref(['', '', ''])
+const audioLanguages = ref<AudioLanguages>({})
+const audioDialogSide = ref<DeckSide | null>(null)
 const isOnline = ref(true)
 const isLoadingDeck = ref(false)
 const isSaving = ref(false)
 const isNavigating = ref(false)
 const feedback = useFeedback()
+const speechSynthesis = useSpeechSynthesis()
 const { message: feedbackMessage, variant: feedbackVariant } = feedback
 const loadedDeck = shallowRef<Deck | null>(null)
 const savedDeck = shallowRef<Deck | null>(null)
@@ -66,6 +72,7 @@ async function loadDeck(id: string): Promise<void> {
       deck.sideLabels[1] ?? '',
       deck.sideLabels[2] ?? '',
     ]
+    audioLanguages.value = { ...deck.audioLanguages }
   } catch (error: unknown) {
     console.error(`DeckEditView could not load deck ${id}:`, error)
     feedback.showError('Unable to load this deck. Please check your connection and try again.', {
@@ -131,9 +138,11 @@ async function handleSubmit(): Promise<void> {
       sideLabels.value.slice(0, sideCount.value),
       null,
       null,
+      audioLanguages.value,
     )
   deck.title = deckName.value.trim()
   deck.sideLabels = sideLabels.value.slice(0, sideCount.value).map((label) => label.trim())
+  deck.audioLanguages = { ...audioLanguages.value }
 
   isSaving.value = true
   try {
@@ -198,6 +207,8 @@ function resetForm(): void {
   deckName.value = ''
   sideCount.value = 3
   sideLabels.value = ['', '', '']
+  audioLanguages.value = {}
+  audioDialogSide.value = null
   feedback.clear()
 }
 
@@ -214,7 +225,45 @@ function selectSideCount(count: 2 | 3): void {
   if (sideCount.value === count) return
 
   sideCount.value = count
+  if (count === 2) clearAudioSetting(3)
   feedback.clearOnEdit()
+}
+
+function getAudioLanguage(side: number): string | null {
+  if (!Number.isInteger(side) || side < 1 || side > 3) return null
+  return audioLanguages.value[`s${side}` as DeckSideKey] ?? null
+}
+
+function clearAudioSetting(side: DeckSide): void {
+  const sideKey: DeckSideKey = `s${side}`
+  const nextAudioLanguages = { ...audioLanguages.value }
+  delete nextAudioLanguages[sideKey]
+  audioLanguages.value = nextAudioLanguages
+}
+
+function toggleAudio(side: number): void {
+  if (side < 1 || side > sideCount.value) return
+  if (getAudioLanguage(side)) {
+    clearAudioSetting(side as DeckSide)
+    return
+  }
+  audioDialogSide.value = side as DeckSide
+}
+
+function openAudioLanguageDialog(side: number): void {
+  if (side < 1 || side > sideCount.value) return
+  audioDialogSide.value = side as DeckSide
+}
+
+function confirmAudioLanguage(languageCode: string): void {
+  const side = audioDialogSide.value
+  if (!side) return
+  audioLanguages.value = { ...audioLanguages.value, [`s${side}`]: languageCode }
+  audioDialogSide.value = null
+}
+
+function cancelAudioLanguage(): void {
+  audioDialogSide.value = null
 }
 
 watch(
@@ -337,6 +386,37 @@ onUnmounted(() => {
             :placeholder="`Side ${sideNumber}`"
             class="w-full rounded-xl border border-border-subtle bg-surface-muted px-4 py-3 text-primary placeholder:text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-60"
           />
+          <div class="mt-3 flex min-h-11 flex-wrap items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="getAudioLanguage(sideNumber) !== null"
+              :aria-label="`Audio for ${sideLabels[sideNumber - 1] || `side ${sideNumber}`}`"
+              class="inline-flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+              @click="toggleAudio(sideNumber)"
+            >
+              <span>Audio</span>
+              <span
+                aria-hidden="true"
+                class="relative h-6 w-11 rounded-full transition-colors"
+                :class="getAudioLanguage(sideNumber) !== null ? 'bg-brand-primary' : 'bg-slate-600'"
+              >
+                <span
+                  class="absolute top-1 h-4 w-4 rounded-full bg-white transition-transform"
+                  :class="getAudioLanguage(sideNumber) !== null ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </span>
+            </button>
+            <button
+              v-if="getAudioLanguage(sideNumber)"
+              type="button"
+              class="min-h-11 rounded-xl px-3 text-sm text-indigo-300 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+              :aria-label="`Change audio language for ${sideLabels[sideNumber - 1] || `side ${sideNumber}`}`"
+              @click="openAudioLanguageDialog(sideNumber)"
+            >
+              {{ getAudioLanguage(sideNumber) }}
+            </button>
+          </div>
         </div>
 
         <button
@@ -358,5 +438,14 @@ onUnmounted(() => {
     >
       {{ isNavigating ? 'Opening cards…' : 'Add cards to this deck' }}
     </button>
+
+    <AudioLanguageDialog
+      v-if="audioDialogSide !== null"
+      :side-label="sideLabels[audioDialogSide - 1] || `Side ${audioDialogSide}`"
+      :languages="speechSynthesis.languages.value"
+      :current-language-code="getAudioLanguage(audioDialogSide)"
+      @confirm="confirmAudioLanguage"
+      @cancel="cancelAudioLanguage"
+    />
   </section>
 </template>

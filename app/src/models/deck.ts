@@ -1,4 +1,5 @@
 import { dataRouter } from '@/data/dataRouter'
+import type { AudioLanguages, DeckSideKey } from '@/data/dataTypes'
 import {
   databaseCharacterLength,
   errorMessage,
@@ -6,6 +7,25 @@ import {
   requiredDate,
   requiredString,
 } from '@/models/modelUtils'
+
+export type DeckSide = 1 | 2 | 3
+
+/**
+ * @summary Determines whether a value is a valid BCP 47 language tag.
+ * @param {unknown} value - The language tag to validate.
+ * @returns {value is string} True when the value contains one valid language tag.
+ */
+function assertLanguageCode(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.trim() !== value || value.length === 0) {
+    throw new Error('Audio language code must be a non-empty BCP 47 language tag.')
+  }
+
+  try {
+    Intl.getCanonicalLocales(value)
+  } catch {
+    throw new Error(`Invalid audio language code: ${value}.`)
+  }
+}
 
 /**
  * @summary Represents a study deck containing user-defined side labels and active record persistence.
@@ -22,6 +42,7 @@ export class Deck {
     public sideLabels: string[],
     public readonly createdAt: Date | null,
     public readonly updatedAt: Date | null,
+    public audioLanguages: AudioLanguages = {},
   ) {}
 
   /**
@@ -35,6 +56,44 @@ export class Deck {
       throw new Error(`Invalid side number: ${sideNum}. Side numbers must be between 1 and 3.`)
     }
     return this.sideLabels[sideNum - 1] || `Side ${sideNum}`
+  }
+
+  /**
+   * @summary Gets the configured audio language for a side.
+   * @param {DeckSide} side - The one-based side number.
+   * @returns {string | null} The language code, or null when audio is disabled.
+   * @throws {Error} If the side does not exist in this deck.
+   */
+  public getAudioLanguage(side: DeckSide): string | null {
+    this.validateSide(side)
+    return this.audioLanguages[`s${side}` as DeckSideKey] ?? null
+  }
+
+  /**
+   * @summary Enables audio for a side with the supplied language code.
+   * @param {DeckSide} side - The one-based side number.
+   * @param {string} languageCode - The BCP 47 language code.
+   * @returns {void}
+   * @throws {Error} If the side or language code is invalid.
+   */
+  public setAudioLanguage(side: DeckSide, languageCode: string): void {
+    this.validateSide(side)
+    assertLanguageCode(languageCode)
+
+    this.audioLanguages = { ...this.audioLanguages, [`s${side}`]: languageCode }
+  }
+
+  /**
+   * @summary Disables audio for a side.
+   * @param {DeckSide} side - The one-based side number.
+   * @returns {void}
+   * @throws {Error} If the side does not exist in this deck.
+   */
+  public clearAudioLanguage(side: DeckSide): void {
+    this.validateSide(side)
+    const sideKey: DeckSideKey = `s${side}`
+    const { [sideKey]: _removed, ...audioLanguages } = this.audioLanguages
+    this.audioLanguages = audioLanguages
   }
 
   /**
@@ -53,6 +112,7 @@ export class Deck {
         user_id: this.userId,
         title: this.title,
         side_labels: this.sideLabels,
+        audio_languages: this.audioLanguages,
       })
       Object.assign(this, {
         id: saved.id,
@@ -95,6 +155,35 @@ export class Deck {
       )
     ) {
       throw new Error(`Deck side labels cannot exceed ${Deck.MAX_SIDE_LABEL_LENGTH} characters.`)
+    }
+    if (
+      !this.audioLanguages ||
+      typeof this.audioLanguages !== 'object' ||
+      Array.isArray(this.audioLanguages)
+    ) {
+      throw new Error('Deck audio languages must be an object.')
+    }
+    for (const [sideKey, languageCode] of Object.entries(this.audioLanguages)) {
+      if (!['s1', 's2', 's3'].includes(sideKey)) {
+        throw new Error(`Invalid deck audio side: ${sideKey}.`)
+      }
+      const side = Number(sideKey.slice(1))
+      if (side > this.sideLabels.length) {
+        throw new Error(`Cannot configure audio for missing side ${side}.`)
+      }
+      assertLanguageCode(languageCode)
+    }
+  }
+
+  /**
+   * @summary Ensures a side number exists on this deck.
+   * @param {DeckSide} side - The one-based side number.
+   * @returns {void}
+   * @throws {Error} If the side number is invalid or absent.
+   */
+  private validateSide(side: DeckSide): void {
+    if (!Number.isInteger(side) || side < 1 || side > this.sideLabels.length) {
+      throw new Error(`Invalid side number: ${side}. This deck does not contain that side.`)
     }
   }
 
@@ -188,6 +277,7 @@ export class Deck {
       if (databaseCharacterLength(title) > Deck.MAX_DATABASE_TITLE_LENGTH) {
         throw new Error('Invalid raw data: Deck title exceeds the database limit.')
       }
+      const audioLanguages = Deck.parseAudioLanguages(json.audio_languages, parsedSideLabels.length)
 
       return new Deck(
         requiredString(json, 'id', 'Deck'),
@@ -196,9 +286,38 @@ export class Deck {
         parsedSideLabels,
         requiredDate(json, 'created_at', 'Deck'),
         requiredDate(json, 'updated_at', 'Deck'),
+        audioLanguages,
       )
     } catch (error: unknown) {
       throw new Error(`Failed to parse Deck from JSON: ${errorMessage(error)}`)
     }
+  }
+
+  /**
+   * @summary Parses and validates a stored side-to-language map.
+   * @param {unknown} value - The database value to parse.
+   * @param {number} sideCount - The number of sides configured on the deck.
+   * @returns {AudioLanguages} The validated map, or an empty map for legacy rows.
+   * @throws {Error} If the stored map is malformed or configures an absent side.
+   */
+  private static parseAudioLanguages(value: unknown, sideCount: number): AudioLanguages {
+    if (value === undefined) return {}
+    if (!isDatabaseRecord(value)) {
+      throw new Error('Invalid raw data: Invalid audio_languages to parse Deck.')
+    }
+
+    const audioLanguages: AudioLanguages = {}
+    for (const [sideKey, languageCode] of Object.entries(value)) {
+      if (!['s1', 's2', 's3'].includes(sideKey)) {
+        throw new Error('Invalid raw data: Invalid audio_languages to parse Deck.')
+      }
+      assertLanguageCode(languageCode)
+      const side = Number(sideKey.slice(1))
+      if (side > sideCount) {
+        throw new Error('Invalid raw data: Audio language is configured for a missing side.')
+      }
+      audioLanguages[sideKey as DeckSideKey] = languageCode
+    }
+    return audioLanguages
   }
 }

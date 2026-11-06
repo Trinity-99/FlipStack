@@ -3,6 +3,7 @@ import { AuthenticationError } from '@/data/authenticationError'
 import type {
   CardRow,
   CardRowWithTagIds,
+  AudioLanguages,
   DeckPreferenceRow,
   DeckRow,
   DeckSyncData,
@@ -50,6 +51,7 @@ export interface DeckInput {
   user_id: string
   title: string
   side_labels: string[]
+  audio_languages: AudioLanguages
 }
 
 export interface CardInput {
@@ -228,6 +230,7 @@ export class RemoteSource {
       user_id: row.user_id,
       title: row.title,
       side_labels: row.side_labels,
+      audio_languages: row.audio_languages,
     })
   }
 

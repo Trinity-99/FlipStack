@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import { StudyService } from '@/engine/studyService'
 import type { StudyRating } from '@/engine/studyService'
+import { useSpeechSynthesis } from '@/composables/useSpeechSynthesis'
 import type { DirectionStep } from '@/models/direction'
+import type { DeckSide } from '@/models/deck'
 import { useDeckStore } from '@/stores/deckStore'
 import { useStudyStore } from '@/stores/studyStore'
 
@@ -61,6 +63,7 @@ const router = useRouter()
 const deckStore = useDeckStore()
 const studyStore = useStudyStore()
 const studyService = new StudyService()
+const speechSynthesis = useSpeechSynthesis()
 
 const stageEl = ref<HTMLElement | null>(null)
 const moverEl = ref<HTMLElement | null>(null)
@@ -97,6 +100,20 @@ const sideLabels = computed(() => {
 })
 const currentSideLabel = computed(() => sideLabels.value[currentSideIndex.value] ?? '')
 const currentSideContent = computed(() => getSideContent(currentStep.value))
+const activeErrorMessage = computed(() => speechSynthesis.error.value ?? studyStore.error ?? '')
+const currentAudioLanguage = computed(() => {
+  const step = currentStep.value
+  const deck = deckStore.activeDeck
+  if (!step || !deck || step.side < 1 || step.side > 3) return null
+  return deck.getAudioLanguage(step.side as DeckSide)
+})
+const canPlayCurrentSide = computed(
+  () =>
+    currentAudioLanguage.value !== null &&
+    speechSynthesis.languages.value.some(
+      (language) => language.code === currentAudioLanguage.value,
+    ),
+)
 const currentScore = computed(() => {
   const cardId = currentCard.value?.id
   if (!cardId) return 0
@@ -273,6 +290,17 @@ function turnToPreviousSide(): void {
   turnToSide('previous')
 }
 
+function playCurrentSideAudio(): void {
+  const languageCode = currentAudioLanguage.value
+  if (!languageCode || !canPlayCurrentSide.value) return
+
+  if (speechSynthesis.isSpeaking.value) {
+    speechSynthesis.stop()
+    return
+  }
+  speechSynthesis.speak(currentSideContent.value ?? '', languageCode)
+}
+
 async function editCurrentCard(): Promise<void> {
   const cardId = currentCard.value?.id
   if (!cardId || isRating.value) return
@@ -294,6 +322,7 @@ function settleDrag(): void {
 async function rateCurrentCard(rating: StudyRating, fromOffsetY = 0): Promise<void> {
   if (isRating.value || !currentCard.value) return
 
+  speechSynthesis.stop()
   isRating.value = true
   feedbackRating.value = rating
   springBack.value = false
@@ -483,6 +512,10 @@ watch(
   },
 )
 
+watch([currentCard, () => currentStep.value?.side, currentSideContent], () =>
+  speechSynthesis.stop(),
+)
+
 onMounted(() => {
   motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null
   isReducedMotion.value = motionPreference?.matches ?? false
@@ -493,6 +526,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   motionPreference?.removeEventListener('change', handleMotionPreferenceChange)
+  speechSynthesis.stop()
 })
 </script>
 
@@ -530,9 +564,9 @@ onBeforeUnmount(() => {
     </header>
 
     <FeedbackBanner
-      v-if="studyStore.error"
+      v-if="activeErrorMessage"
       class="mt-3"
-      :message="studyStore.error"
+      :message="activeErrorMessage"
       variant="error"
     />
 
@@ -613,7 +647,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="flex flex-1 items-center justify-center">
+      <div class="relative flex flex-1 items-center justify-center">
         <div
           ref="stageEl"
           class="study-stage mx-auto h-60 w-[82%] max-w-xs sm:aspect-[1.225] sm:h-auto sm:max-w-none"
@@ -665,6 +699,35 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
+        <button
+          v-if="canPlayCurrentSide"
+          type="button"
+          class="absolute left-1/2 top-[calc(50%+5rem)] z-10 flex min-h-11 min-w-11 -translate-x-1/2 items-center justify-center rounded-xl border border-slate-600 bg-surface-muted text-primary shadow-lg transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+          :aria-label="
+            speechSynthesis.isSpeaking.value
+              ? `Stop audio for ${currentSideLabel}`
+              : `Play audio for ${currentSideLabel}`
+          "
+          :title="speechSynthesis.isSpeaking.value ? 'Stop audio' : 'Play audio'"
+          @pointerdown.stop
+          @click.stop="playCurrentSideAudio"
+        >
+          <svg
+            v-if="!speechSynthesis.isSpeaking.value"
+            aria-hidden="true"
+            class="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <path
+              d="M4 9v6h4l5 4V5L8 9H4zm13 3a3 3 0 00-2-2.83v5.66A3 3 0 0017 12zm-2-7.5v2.06a6 6 0 010 10.88v2.06a8 8 0 000-15z"
+              fill="currentColor"
+            />
+          </svg>
+          <svg v-else aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+          </svg>
+        </button>
       </div>
 
       <p id="study-card-instructions" class="sr-only">
