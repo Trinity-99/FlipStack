@@ -139,6 +139,11 @@ async function handleSubmit(): Promise<void> {
   try {
     await deck.save()
     deckStore.upsertDeck(deck)
+    if (isEditMode.value) {
+      router.back()
+      return
+    }
+
     savedDeck.value = deck
     feedback.showSuccess(`Deck "${deck.title}" saved successfully`)
   } catch (error: unknown) {

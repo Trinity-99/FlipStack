@@ -101,21 +101,40 @@ onBeforeUnmount(() => {
         No decks yet.
       </p>
 
-      <button
+      <div
         v-for="deck in deckStore.decks"
         :key="deck.id ?? deck.title"
-        type="button"
-        role="menuitem"
-        class="flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-primary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-wait disabled:opacity-50"
-        :aria-current="deck.id === deckStore.activeDeckId ? 'true' : undefined"
-        :disabled="deckStore.isLoading || !deck.id"
-        @click="deck.id && selectDeck(deck.id)"
+        class="flex min-h-11 w-full items-center rounded-xl text-sm text-primary transition-colors hover:bg-surface-muted"
       >
-        <span class="truncate">{{ deck.title }}</span>
-        <span v-if="deck.id === deckStore.activeDeckId" class="ml-2 text-brand-primary">
-          Active
-        </span>
-      </button>
+        <button
+          type="button"
+          role="menuitem"
+          class="flex min-h-11 min-w-0 flex-1 items-center justify-between rounded-l-xl px-3 py-2 text-left focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-wait disabled:opacity-50"
+          :aria-current="deck.id === deckStore.activeDeckId ? 'true' : undefined"
+          :disabled="deckStore.isLoading || !deck.id"
+          @click="deck.id && selectDeck(deck.id)"
+        >
+          <span class="truncate">{{ deck.title }}</span>
+          <span v-if="deck.id === deckStore.activeDeckId" class="ml-2 shrink-0 text-brand-primary">
+            Active
+          </span>
+        </button>
+        <RouterLink
+          v-if="deck.id"
+          :to="{ name: 'DeckEdit', params: { deckId: deck.id } }"
+          role="menuitem"
+          :aria-label="`Edit ${deck.title}`"
+          title="Edit deck"
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-r-xl text-secondary transition-colors hover:text-brand-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+          @click="closeMenu"
+        >
+          <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M13.586 3.586a2 2 0 0 1 2.828 2.828l-8.5 8.5a1 1 0 0 1-.465.263l-3.5.875a.5.5 0 0 1-.606-.606l.875-3.5a1 1 0 0 1 .263-.465l8.5-8.5ZM12.5 5.5l2 2"
+            />
+          </svg>
+        </RouterLink>
+      </div>
 
       <RouterLink
         :to="{ name: 'DeckCreate' }"

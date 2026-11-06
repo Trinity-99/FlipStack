@@ -11,6 +11,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'Home', component: { template: '<div />' } },
     { path: '/decks/new', name: 'DeckCreate', component: { template: '<div />' } },
+    { path: '/decks/:deckId/edit', name: 'DeckEdit', component: { template: '<div />' } },
   ],
 })
 
@@ -78,6 +79,30 @@ describe('DeckSwitcher', () => {
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('DeckCreate')
+  })
+
+  it('provides an edit action for every deck, including the active deck', async () => {
+    const store = useDeckStore()
+    store.decks = [
+      new Deck('deck-1', 'user-1', 'Thai', ['Script', 'Meaning'], null, null),
+      new Deck('deck-2', 'user-1', 'Burmese', ['Script', 'Meaning'], null, null),
+    ]
+    store.activeDeckId = 'deck-1'
+    const wrapper = mountSwitcher()
+
+    await wrapper.get('[aria-label="Select active deck"]').trigger('click')
+
+    expect(wrapper.find('[aria-label="Edit Thai"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Edit Burmese"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Edit Thai"]').element.parentElement?.textContent).toContain(
+      'Active',
+    )
+    await wrapper.get('[aria-label="Edit Burmese"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('DeckEdit')
+    expect(router.currentRoute.value.params.deckId).toBe('deck-2')
+    expect(wrapper.find('[role="menu"]').exists()).toBe(false)
   })
 
   it('prevents deck switching when the editor locks the active deck', async () => {

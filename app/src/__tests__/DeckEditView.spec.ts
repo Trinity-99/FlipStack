@@ -12,6 +12,7 @@ const createdAt = new Date('2026-01-01T00:00:00.000Z')
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [
+    { path: '/cards', name: 'CardList', component: { template: '<div>Card list</div>' } },
     { path: '/decks/new', name: 'DeckCreate', component: DeckEditView },
     { path: '/decks/:deckId/edit', name: 'DeckEdit', component: DeckEditView },
     { path: '/cards/new', name: 'CardCreate', component: { template: '<div>Card creation</div>' } },
@@ -177,6 +178,7 @@ describe('DeckEditView', () => {
     const deck = new Deck('deck-1', 'user-1', 'Thai', ['Script', 'Meaning'], createdAt, createdAt)
     vi.spyOn(Deck, 'findById').mockResolvedValue(deck)
     mockSuccessfulSave('deck-1')
+    await router.push('/cards')
     await router.push('/decks/deck-1/edit')
     const wrapper = mountView()
     await flushPromises()
@@ -190,6 +192,8 @@ describe('DeckEditView', () => {
 
     expect(useDeckStore().decks).toEqual([deck])
     expect(deck.title).toBe('Thai Words')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('CardList')
   })
 
   it('does not allow editing a deck owned by another user', async () => {
