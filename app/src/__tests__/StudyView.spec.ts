@@ -395,6 +395,23 @@ describe('StudyView', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('SessionStart'))
   })
 
+  it('shows an accurate completion message when no cards remain after deletion', async () => {
+    const { wrapper, studyStore } = await mountStudyView()
+    const session = studyStore.activeSession
+    if (!session) throw new Error('Expected an active study session.')
+    studyStore.activeSession = {
+      ...session,
+      currentCard: null,
+      isSessionComplete: true,
+      masteredDuringSession: 0,
+    }
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('No more cards to study for Whole Deck.')
+    expect(wrapper.text()).not.toContain('You mastered 0 cards')
+  })
+
   it('opens the current card editor from side navigation', async () => {
     const { wrapper, router } = await mountStudyView()
 

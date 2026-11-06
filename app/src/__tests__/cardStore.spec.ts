@@ -64,12 +64,26 @@ describe('useCardStore', () => {
     expect(store.cards).toEqual([updatedCard])
   })
 
+  it('removes a deleted card from the matching deck cache', () => {
+    const store = useCardStore()
+    const card = new Card('card-1', 'deck-1', 'user-1', { s1: 'front' }, [], null, null)
+    const otherCard = new Card('card-2', 'deck-1', 'user-1', { s1: 'other' }, [], null, null)
+    store.setCardsForDeck('deck-1', [card, otherCard])
+
+    store.removeCard(card)
+
+    expect(store.cards).toEqual([otherCard])
+  })
+
   it('rejects an unsaved card', () => {
     const store = useCardStore()
     const unsavedCard = new Card(null, 'deck-1', 'user-1', { s1: 'front' }, [], null, null)
 
     expect(() => store.upsertCard(unsavedCard)).toThrow(
       'Cannot add a card to the cache before it has been saved.',
+    )
+    expect(() => store.removeCard(unsavedCard)).toThrow(
+      'Cannot remove a card from the cache before it has been saved.',
     )
   })
 

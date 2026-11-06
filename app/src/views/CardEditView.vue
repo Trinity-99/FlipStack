@@ -42,6 +42,8 @@ const selectedTagIds = ref<string[]>([])
 const loadedCard = shallowRef<Card | null>(null)
 const isLoadingCard = ref(false)
 const isSaving = ref(false)
+const isDeleting = ref(false)
+const isDeleteDialogOpen = ref(false)
 const isCreatingTag = ref(false)
 const feedback = useFeedback()
 const { message: feedbackMessage, variant: feedbackVariant } = feedback
@@ -51,6 +53,7 @@ const isFormDisabled = computed(
     deckStore.isLoading ||
     isLoadingCard.value ||
     isSaving.value ||
+    isDeleting.value ||
     isCreatingTag.value ||
     !authStore.profile ||
     !activeDeck.value ||
@@ -304,7 +307,7 @@ async function saveCard(action: SaveAction): Promise<void> {
  * @returns {Promise<void>}
  */
 async function cancelEditing(): Promise<void> {
-  if (isSaving.value || isCreatingTag.value) return
+  if (isSaving.value || isDeleting.value || isCreatingTag.value) return
 
   if (route.query.returnTo === 'card-list') {
     try {
@@ -317,6 +320,51 @@ async function cancelEditing(): Promise<void> {
   }
 
   router.back()
+}
+
+/**
+ * @summary Closes the delete confirmation without deleting the card.
+ * @returns {void}
+ */
+function cancelCardDeletion(): void {
+  if (isDeleting.value) return
+  isDeleteDialogOpen.value = false
+}
+
+/**
+ * @summary Deletes the persisted card and synchronizes its caches before returning.
+ * @returns {Promise<void>}
+ */
+async function confirmCardDeletion(): Promise<void> {
+  const card = loadedCard.value
+  if (!card?.id || isFormDisabled.value || isDeleting.value) return
+
+  isDeleteDialogOpen.value = false
+  feedback.clear()
+  isDeleting.value = true
+  try {
+    await card.delete()
+  } catch (error: unknown) {
+    console.error('CardEditView could not delete card:', error)
+    feedback.showError('Unable to delete this card. Please try again.')
+    isDeleting.value = false
+    return
+  }
+
+  cardStore.removeCard(card)
+  if (route.query.returnTo === 'study') {
+    studyStore.removeCardFromSession(card)
+  }
+  isDeleting.value = false
+
+  try {
+    await router.replace({
+      name: route.query.returnTo === 'study' ? 'Study' : 'CardList',
+    })
+  } catch (error: unknown) {
+    console.error('CardEditView deleted the card but could not navigate away:', error)
+    feedback.showError('Card deleted, but unable to leave this screen. Please try again.')
+  }
 }
 
 /**
@@ -343,14 +391,49 @@ watch(
       <h1 id="card-edit-title" class="text-2xl font-bold text-primary sm:text-3xl">
         {{ isEditMode ? 'Edit card' : 'Create a card' }}
       </h1>
-      <button
-        type="button"
-        :disabled="isSaving || isCreatingTag"
-        class="min-h-11 shrink-0 rounded-xl border border-border-subtle bg-surface-muted px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
-        @click="cancelEditing"
-      >
-        Cancel
-      </button>
+      <div class="flex shrink-0 items-center gap-2">
+        <button
+          v-if="isEditMode"
+          type="button"
+          aria-label="Delete card"
+          title="Delete card"
+          :disabled="isFormDisabled"
+          class="flex min-h-11 items-center gap-2 rounded-xl border 
+              border-rose-500/50 bg-rose-950/40 px-3 py-2 text-sm font-semibold 
+              text-rose-200 transition-colors hover:bg-rose-950/80 
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 
+              disabled:cursor-not-allowed disabled:opacity-50"
+          @click="isDeleteDialogOpen = true"
+        >
+          <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M4.75 7.25h14.5M9.25 7.25V4.75h5.5v2.5m-8 0 1 12h8.5l1-12M10 10.5v5.5m4-5.5v5.5"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          
+        </button>
+        <button
+          type="button"
+          aria-label="Cancel editing"
+          :disabled="isSaving || isDeleting || isCreatingTag"
+          class="flex min-h-11 items-center gap-2 rounded-xl border border-border-subtle bg-surface-muted px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+          @click="cancelEditing"
+        >
+          <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+            <path
+              d="m6 6 12 12M18 6 6 18"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+          
+        </button>
+      </div>
     </header>
 
     <FeedbackBanner :message="feedbackMessage" :variant="feedbackVariant" />
@@ -442,5 +525,43 @@ watch(
         </button>
       </fieldset>
     </form>
+
+    <dialog
+      v-if="isDeleteDialogOpen"
+      open
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-card-title"
+      class="fixed inset-0 z-50 m-0 flex h-dvh max-h-none w-full max-w-none items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm"
+      @click.self="cancelCardDeletion"
+      @keydown.esc.prevent="cancelCardDeletion"
+    >
+      <div
+        class="my-auto w-full max-w-sm rounded-3xl border-2 border-slate-600 bg-card p-4 shadow-2xl sm:p-6"
+      >
+        <h2 id="delete-card-title" class="text-xl font-semibold text-primary">Delete this card?</h2>
+        <p class="mt-2 text-sm text-secondary">
+          This permanently deletes the card and its study progress.
+        </p>
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            class="min-h-11 rounded-xl px-4 text-secondary hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="isDeleting"
+            @click="cancelCardDeletion"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="min-h-11 rounded-xl bg-rose-700 px-5 font-semibold text-white hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="isDeleting"
+            @click="confirmCardDeletion"
+          >
+            {{ isDeleting ? 'Deleting…' : 'Delete card' }}
+          </button>
+        </div>
+      </div>
+    </dialog>
   </section>
 </template>

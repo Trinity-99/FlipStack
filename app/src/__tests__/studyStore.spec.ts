@@ -122,6 +122,33 @@ describe('useStudyStore', () => {
     expect(store.sessionPool[0]).toBe(correctedCard)
   })
 
+  it('removes a deleted current card from the active session and recalculates its pool', async () => {
+    const otherCard = new Card(
+      'card-2',
+      'deck-1',
+      'user-1',
+      { s1: 'other word', s2: 'other translation' },
+      ['tag-1'],
+      createdAt,
+      createdAt,
+    )
+    useCardStore().setCardsForDeck('deck-1', [eligibleCard, otherCard])
+    const store = useStudyStore()
+    await store.startSession(null, direction)
+    const session = store.startActiveSession()
+    const deletedCard = session.currentCard
+    if (!deletedCard) throw new Error('Expected the active study card.')
+    const remainingCard = session.cards.find((card) => card.id !== deletedCard.id)
+    if (!remainingCard) throw new Error('Expected another card in the study session.')
+
+    store.removeCardFromSession(deletedCard)
+
+    expect(store.activeSession?.cards).not.toContain(deletedCard)
+    expect(store.activeSession?.currentCard).toBe(remainingCard)
+    expect(store.poolSummary?.cardsToLearn).toEqual([remainingCard])
+    expect(store.sessionPool).toEqual([remainingCard])
+  })
+
   it('saves a temporary direction and preference only when starting', async () => {
     const temporaryDirection = new Direction(
       null,

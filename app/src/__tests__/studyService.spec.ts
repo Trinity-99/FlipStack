@@ -161,6 +161,44 @@ describe('StudyService', () => {
     expect(summary.isMastered).toBe(false)
   })
 
+  it('removes a deleted current card and its progress from the active session', () => {
+    const deletedCard = createCard('deleted', { s1: 'one', s2: 'uno' })
+    const remainingCard = createCard('remaining', { s1: 'two', s2: 'dos' })
+    const deletedProgress = new CardProgress(
+      'progress-1',
+      'user-1',
+      'deleted',
+      'direction-1',
+      2,
+      new Date('2026-01-01T00:00:00.000Z'),
+    )
+    const session = {
+      userId: 'user-1',
+      cards: [deletedCard, remainingCard],
+      direction,
+      tagId: null,
+      topicLabel: 'Whole Deck',
+      progressRecords: [deletedProgress],
+      poolSummary: service.getPoolSummary(
+        [deletedCard, remainingCard],
+        direction,
+        [deletedProgress],
+        null,
+      ),
+      currentCard: deletedCard,
+      masteredDuringSession: 0,
+      isSessionComplete: false,
+    }
+
+    const updatedSession = service.removeCardFromSession(session, deletedCard)
+
+    expect(updatedSession.cards).toEqual([remainingCard])
+    expect(updatedSession.currentCard).toBe(remainingCard)
+    expect(updatedSession.progressRecords).toEqual([])
+    expect(updatedSession.poolSummary.cardsToLearn).toEqual([remainingCard])
+    expect(updatedSession.isSessionComplete).toBe(false)
+  })
+
   it('marks a non-empty topic mastered only when all eligible cards are at ten', () => {
     const card = createCard('mastered', { s1: 'one', s2: 'uno' })
     const progress = [

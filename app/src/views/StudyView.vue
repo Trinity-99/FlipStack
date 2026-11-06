@@ -595,11 +595,16 @@ onBeforeUnmount(() => {
         <h1 id="study-complete-title" class="text-2xl font-semibold text-primary sm:text-3xl">
           Congratulations!
         </h1>
-        <p class="mt-3 text-secondary">
+        <p v-if="activeSession.masteredDuringSession > 0" class="mt-3 text-secondary">
           You mastered {{ activeSession.masteredDuringSession }}
           {{ activeSession.masteredDuringSession === 1 ? 'card' : 'cards' }} on
           <span class="font-medium text-primary">{{ activeSession.topicLabel }}</span>
           — keep that spirit up!
+        </p>
+        <p v-else class="mt-3 text-secondary">
+          No more cards to study for
+          <span class="font-medium text-primary">{{ activeSession.topicLabel }}</span
+          >.
         </p>
         <button
           type="button"

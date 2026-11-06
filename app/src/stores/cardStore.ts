@@ -61,6 +61,21 @@ export const useCardStore = defineStore('cards', () => {
   }
 
   /**
+   * @summary Removes a deleted card from the matching deck cache.
+   * @param {Card} card - The persisted card to remove.
+   * @returns {void}
+   * @throws {Error} If the card has not been persisted.
+   */
+  function removeCard(card: Card): void {
+    if (!card.id) {
+      throw new Error('Cannot remove a card from the cache before it has been saved.')
+    }
+    if (loadedDeckId.value !== card.deckId) return
+
+    cards.value = cards.value.filter((cachedCard) => cachedCard.id !== card.id)
+  }
+
+  /**
    * @summary Clears cards when the active user or deck context is reset.
    * @returns {void}
    */
@@ -69,5 +84,5 @@ export const useCardStore = defineStore('cards', () => {
     loadedDeckId.value = null
   }
 
-  return { cards, loadedDeckId, fetchCardsForDeck, setCardsForDeck, upsertCard, clear }
+  return { cards, loadedDeckId, fetchCardsForDeck, setCardsForDeck, upsertCard, removeCard, clear }
 })

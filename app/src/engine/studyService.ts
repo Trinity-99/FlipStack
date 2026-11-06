@@ -290,6 +290,45 @@ export class StudyService {
     return nextSession
   }
 
+  /**
+   * @summary Removes a deleted card from the active session and selects the next eligible card.
+   * @param {StudySessionState} session - The active study session.
+   * @param {Card} card - The persisted card being removed.
+   * @returns {StudySessionState} The session recalculated without the deleted card.
+   * @throws {Error} If the card is unsaved or does not belong to the session.
+   */
+  public removeCardFromSession(session: StudySessionState, card: Card): StudySessionState {
+    const cardId = card.id
+    if (!cardId) {
+      throw new Error('Cannot remove an unsaved card from a study session.')
+    }
+    if (!session.cards.some((sessionCard) => sessionCard.id === cardId)) {
+      throw new Error('Cannot remove a card that is not part of the study session.')
+    }
+
+    const cards = session.cards.filter((sessionCard) => sessionCard.id !== cardId)
+    const progressRecords = session.progressRecords.filter((record) => record.cardId !== cardId)
+    const poolSummary = this.getPoolSummary(
+      cards,
+      session.direction,
+      progressRecords,
+      session.tagId,
+    )
+    const currentCard =
+      session.currentCard?.id === cardId
+        ? this.selectNextCard(poolSummary.cardsToLearn, progressRecords, cardId)
+        : session.currentCard
+
+    return {
+      ...session,
+      cards,
+      progressRecords,
+      poolSummary,
+      currentCard,
+      isSessionComplete: currentCard === null,
+    }
+  }
+
   private persistProgress(progress: CardProgress): void {
     const saveKey = `${progress.directionId}:${progress.cardId}`
     const snapshot = new CardProgress(

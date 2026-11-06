@@ -343,6 +343,129 @@ describe('CardEditView', () => {
     expect(router.currentRoute.value.name).toBe('CardList')
   })
 
+  it('shows delete and cross icons beside Cancel only when editing', async () => {
+    vi.spyOn(Card, 'findById').mockResolvedValue(
+      new Card('card-1', 'deck-1', 'user-1', { s1: 'Word' }, [], createdAt, createdAt),
+    )
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[aria-label="Delete card"]').text()).toContain('Delete')
+    expect(wrapper.find('[aria-label="Delete card"] svg').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Cancel editing"]').text()).toContain('Cancel')
+    expect(wrapper.find('[aria-label="Cancel editing"] svg').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('does not delete a card unless deletion is confirmed', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word' },
+      [],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    const deleteCard = vi.spyOn(existingCard, 'delete').mockResolvedValue()
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Delete card"]').trigger('click')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('Delete this card?')
+    await wrapper.get('[role="dialog"] button').trigger('click')
+    await flushPromises()
+
+    expect(deleteCard).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('CardEdit')
+  })
+
+  it('deletes a confirmed card, removes its cache entry, and returns to the card list', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word' },
+      [],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    const deleteCard = vi.spyOn(existingCard, 'delete').mockResolvedValue()
+    const cardStore = useCardStore()
+    cardStore.setCardsForDeck('deck-1', [existingCard])
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Delete card"]').trigger('click')
+    await clickButton(wrapper, 'Delete card')
+    await flushPromises()
+
+    expect(deleteCard).toHaveBeenCalledOnce()
+    expect(cardStore.cards).toEqual([])
+    expect(router.currentRoute.value.name).toBe('CardList')
+  })
+
+  it('removes a deleted study card from the active session and returns to study', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word' },
+      [],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    vi.spyOn(existingCard, 'delete').mockResolvedValue()
+    const removeCardFromSession = vi.spyOn(useStudyStore(), 'removeCardFromSession')
+    await router.push('/study')
+    await router.push('/cards/edit/card-1?returnTo=study')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Delete card"]').trigger('click')
+    await clickButton(wrapper, 'Delete card')
+    await flushPromises()
+
+    expect(removeCardFromSession).toHaveBeenCalledWith(existingCard)
+    expect(router.currentRoute.value.name).toBe('Study')
+  })
+
+  it('keeps the card cached and shows an error when deletion fails', async () => {
+    const existingCard = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word' },
+      [],
+      createdAt,
+      createdAt,
+    )
+    vi.spyOn(Card, 'findById').mockResolvedValue(existingCard)
+    vi.spyOn(existingCard, 'delete').mockRejectedValue(new Error('Database unavailable'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const cardStore = useCardStore()
+    cardStore.setCardsForDeck('deck-1', [existingCard])
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Delete card"]').trigger('click')
+    await clickButton(wrapper, 'Delete card')
+    await flushPromises()
+
+    expect(cardStore.cards).toEqual([existingCard])
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      'Unable to delete this card. Please try again.',
+    )
+    expect(router.currentRoute.value.name).toBe('CardEdit')
+  })
+
   it('returns to the study session after saving an edited study card', async () => {
     const existingCard = new Card(
       'card-1',

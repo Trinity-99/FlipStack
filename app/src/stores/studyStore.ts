@@ -202,6 +202,20 @@ export const useStudyStore = defineStore('study', () => {
   }
 
   /**
+   * @summary Removes a deleted card from the active study session.
+   * @param {Card} card - The persisted card to remove from the session.
+   * @returns {void}
+   */
+  function removeCardFromSession(card: Card): void {
+    const session = activeSession.value
+    if (!session) return
+
+    const updatedSession = studyService.removeCardFromSession(session, card)
+    activeSession.value = updatedSession
+    updatePoolState(updatedSession)
+  }
+
+  /**
    * @summary Resets topic mastery through the Study Engine and publishes the refreshed pool.
    * @param {string | null} tagId - The selected topic, or null for the whole deck.
    * @param {Direction} direction - The selected saved direction.
@@ -239,6 +253,7 @@ export const useStudyStore = defineStore('study', () => {
     startActiveSession,
     rateCurrentCard,
     replaceCurrentCard,
+    removeCardFromSession,
     resetMastery,
   }
 })
