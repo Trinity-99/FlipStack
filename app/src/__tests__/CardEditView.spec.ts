@@ -35,6 +35,7 @@ describe('CardEditView', () => {
   beforeEach(async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     useAuthStore().profile = new Profile('user-1', createdAt, createdAt)
     const deckStore = useDeckStore()
     deckStore.decks = [deck]
@@ -532,5 +533,47 @@ describe('CardEditView', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('Unable to save this card. Please try again.')
     expect(wrapper.find('[role="status"]').exists()).toBe(false)
     expect(router.currentRoute.value.name).toBe('CardCreate')
+  })
+
+  it('shows the persistent offline banner and prevents saving an edited card until reconnected', async () => {
+    const card = new Card(
+      'card-1',
+      'deck-1',
+      'user-1',
+      { s1: 'Word', s2: 'Phonetic' },
+      [],
+      createdAt,
+      createdAt,
+    )
+    const save = vi.spyOn(Card.prototype, 'save').mockResolvedValue()
+    vi.spyOn(Card, 'findById').mockResolvedValue(card)
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await router.push('/cards/edit/card-1')
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[role="status"]').text()).toBe(
+      'Please connect to the Internet — offline data entry is not supported',
+    )
+    expect((wrapper.get('#card-side-1').element as HTMLTextAreaElement).matches(':disabled')).toBe(
+      true,
+    )
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === 'Save Changes')
+    if (!saveButton) throw new Error('Expected the save action while editing a card.')
+    expect(saveButton.attributes('disabled')).toBeDefined()
+    await clickButton(wrapper, 'Save Changes')
+    expect(save).not.toHaveBeenCalled()
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect((wrapper.get('#card-side-1').element as HTMLTextAreaElement).matches(':disabled')).toBe(
+      false,
+    )
+    await clickButton(wrapper, 'Save Changes')
+    await flushPromises()
+    expect(save).toHaveBeenCalledOnce()
   })
 })

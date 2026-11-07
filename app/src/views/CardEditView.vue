@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import TagSelector from '@/components/TagSelector.vue'
@@ -45,11 +45,13 @@ const isSaving = ref(false)
 const isDeleting = ref(false)
 const isDeleteDialogOpen = ref(false)
 const isCreatingTag = ref(false)
+const isOnline = ref(true)
 const feedback = useFeedback()
 const { message: feedbackMessage, variant: feedbackVariant } = feedback
 const firstSideInput = ref<HTMLTextAreaElement | null>(null)
 const isFormDisabled = computed(
   () =>
+    !isOnline.value ||
     deckStore.isLoading ||
     isLoadingCard.value ||
     isSaving.value ||
@@ -378,11 +380,26 @@ function resetForm(): void {
   void nextTick(() => firstSideInput.value?.focus())
 }
 
+function updateOnlineStatus(): void {
+  isOnline.value = navigator.onLine
+}
+
 watch(
   [cardId, () => activeDeck.value?.id ?? null, () => deckStore.isLoading],
   ([id, deckId, isDeckLoading]) => loadFormContext(id, deckId, isDeckLoading),
   { immediate: true },
 )
+
+onMounted(() => {
+  updateOnlineStatus()
+  window.addEventListener('online', updateOnlineStatus)
+  window.addEventListener('offline', updateOnlineStatus)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('online', updateOnlineStatus)
+  window.removeEventListener('offline', updateOnlineStatus)
+})
 </script>
 
 <template>
@@ -398,11 +415,7 @@ watch(
           aria-label="Delete card"
           title="Delete card"
           :disabled="isFormDisabled"
-          class="flex min-h-11 items-center gap-2 rounded-xl border 
-              border-rose-500/50 bg-rose-950/40 px-3 py-2 text-sm font-semibold 
-              text-rose-200 transition-colors hover:bg-rose-950/80 
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 
-              disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex min-h-11 items-center gap-2 rounded-xl border border-rose-500/50 bg-rose-950/40 px-3 py-2 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-950/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
           @click="isDeleteDialogOpen = true"
         >
           <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
@@ -414,7 +427,6 @@ watch(
               stroke-linejoin="round"
             />
           </svg>
-          
         </button>
         <button
           type="button"
@@ -431,10 +443,18 @@ watch(
               stroke-linecap="round"
             />
           </svg>
-          
         </button>
       </div>
     </header>
+
+    <div
+      v-if="!isOnline"
+      class="mb-5 rounded-xl border border-amber-800/60 bg-amber-950 px-4 py-3 text-sm text-amber-300"
+      role="status"
+      aria-live="polite"
+    >
+      Please connect to the Internet — offline data entry is not supported
+    </div>
 
     <FeedbackBanner :message="feedbackMessage" :variant="feedbackVariant" />
 
@@ -555,7 +575,7 @@ watch(
           <button
             type="button"
             class="min-h-11 rounded-xl bg-rose-700 px-5 font-semibold text-white hover:bg-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="isDeleting"
+            :disabled="isDeleting || isFormDisabled"
             @click="confirmCardDeletion"
           >
             {{ isDeleting ? 'Deleting…' : 'Delete card' }}
