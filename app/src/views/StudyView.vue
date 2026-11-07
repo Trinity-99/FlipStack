@@ -372,8 +372,12 @@ function classifyDrag(deltaX: number, deltaY: number): DragLock {
   return null
 }
 
+function isButtonTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('button') !== null
+}
+
 function handlePointerDown(event: PointerEvent): void {
-  if (isRating.value || !event.isPrimary) return
+  if (isRating.value || !event.isPrimary || isButtonTarget(event.target)) return
   pointerOrigin = {
     id: event.pointerId,
     x: event.clientX,
@@ -412,6 +416,11 @@ async function handlePointerUp(event: PointerEvent): Promise<void> {
   const origin = pointerOrigin
   if (!origin || origin.id !== event.pointerId) return
   pointerOrigin = null
+
+  if (isButtonTarget(event.target)) {
+    settleDrag()
+    return
+  }
 
   const deltaX = event.clientX - origin.x
   const deltaY = event.clientY - origin.y
@@ -703,36 +712,39 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-        </div>
-        <button
-          v-if="canPlayCurrentSide"
-          type="button"
-          class="absolute left-1/2 top-[calc(50%+5rem)] z-10 flex min-h-11 min-w-11 -translate-x-1/2 items-center justify-center rounded-xl border border-slate-600 bg-surface-muted text-primary shadow-lg transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
-          :aria-label="
-            speechSynthesis.isSpeaking.value
-              ? `Stop audio for ${currentSideLabel}`
-              : `Play audio for ${currentSideLabel}`
-          "
-          :title="speechSynthesis.isSpeaking.value ? 'Stop audio' : 'Play audio'"
-          @pointerdown.stop
-          @click.stop="playCurrentSideAudio"
-        >
-          <svg
-            v-if="!speechSynthesis.isSpeaking.value"
-            aria-hidden="true"
-            class="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
+          <button
+            v-if="canPlayCurrentSide"
+            type="button"
+            class="absolute bottom-3 left-1/2 z-20 flex min-h-11 min-w-11 -translate-x-1/2 items-center justify-center rounded-xl border border-slate-600 bg-surface-muted text-primary shadow-lg transition-colors hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary"
+            :aria-label="
+              speechSynthesis.isSpeaking.value
+                ? `Stop audio for ${currentSideLabel}`
+                : `Play audio for ${currentSideLabel}`
+            "
+            :title="speechSynthesis.isSpeaking.value ? 'Stop audio' : 'Play audio'"
+            @pointerdown.stop
+            @pointerup.stop
+            @pointercancel.stop
+            @keydown.stop
+            @click.stop="playCurrentSideAudio"
           >
-            <path
-              d="M4 9v6h4l5 4V5L8 9H4zm13 3a3 3 0 00-2-2.83v5.66A3 3 0 0017 12zm-2-7.5v2.06a6 6 0 010 10.88v2.06a8 8 0 000-15z"
-              fill="currentColor"
-            />
-          </svg>
-          <svg v-else aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
-          </svg>
-        </button>
+            <svg
+              v-if="!speechSynthesis.isSpeaking.value"
+              aria-hidden="true"
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <path
+                d="M4 9v6h4l5 4V5L8 9H4zm13 3a3 3 0 00-2-2.83v5.66A3 3 0 0017 12zm-2-7.5v2.06a6 6 0 010 10.88v2.06a8 8 0 000-15z"
+                fill="currentColor"
+              />
+            </svg>
+            <svg v-else aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 5h4v14H7zM13 5h4v14h-4z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <p id="study-card-instructions" class="sr-only">

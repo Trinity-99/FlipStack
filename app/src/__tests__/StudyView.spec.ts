@@ -170,35 +170,77 @@ describe('StudyView', () => {
   })
 
   it('plays the configured side text without triggering study-card gestures', async () => {
-    const voice = {
-      lang: 'th-TH',
+    const englishVoice = {
+      lang: 'en-US',
       localService: true,
       default: true,
+      name: 'English',
+    } as SpeechSynthesisVoice
+    const thaiVoice = {
+      lang: 'th-TH',
+      localService: true,
+      default: false,
       name: 'Thai',
     } as SpeechSynthesisVoice
-    const synthesis = createSynthesis(() => [voice])
+    const synthesis = createSynthesis(() => [englishVoice, thaiVoice])
     vi.stubGlobal('speechSynthesis', synthesis)
     vi.stubGlobal('SpeechSynthesisUtterance', FakeSpeechSynthesisUtterance)
-    deck.audioLanguages = { s1: 'th-TH', s2: 'th-TH' }
+    deck.audioLanguages = { s1: 'en-US', s2: 'th-TH' }
 
     const { wrapper } = await mountStudyView()
     await flushPromises()
     const initialAnnouncement = currentSideAnnouncement(wrapper)
-    expect(wrapper.find('.study-stage button').exists()).toBe(false)
+    const audioButton = wrapper.get('[aria-label="Play audio for Prompt"]')
+    expect(audioButton.classes()).toContain('bottom-3')
+    expect(audioButton.element.parentElement?.classList.contains('study-stage')).toBe(true)
 
-    await wrapper.get('[aria-label="Play audio for Prompt"]').trigger('click')
+    dispatchPointerEvent(audioButton.element, 'pointerdown', {
+      pointerId: 2,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+      timeStamp: 10,
+    })
+    dispatchPointerEvent(audioButton.element, 'pointerup', {
+      pointerId: 2,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+      timeStamp: 20,
+    })
+    expect(currentSideAnnouncement(wrapper)).toBe(initialAnnouncement)
+
+    await audioButton.trigger('click')
 
     expect(currentSideAnnouncement(wrapper)).toBe(initialAnnouncement)
     expect(FakeSpeechSynthesisUtterance.instances[0]?.text).toBe('question text')
-    expect(FakeSpeechSynthesisUtterance.instances[0]?.lang).toBe('th-TH')
-    expect(FakeSpeechSynthesisUtterance.instances[0]?.voice).toBe(voice)
+    expect(FakeSpeechSynthesisUtterance.instances[0]?.lang).toBe('en-US')
+    expect(FakeSpeechSynthesisUtterance.instances[0]?.voice).toBe(englishVoice)
 
     await wrapper.get('[aria-label="Next side"]').trigger('click')
     await flushPromises()
     expect(synthesis.cancel).toHaveBeenCalledOnce()
 
-    await wrapper.get('[aria-label="Play audio for Answer"]').trigger('click')
+    expect(audioButton.attributes('aria-label')).toBe('Play audio for Answer')
+    dispatchPointerEvent(audioButton.element, 'pointerdown', {
+      pointerId: 3,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+      timeStamp: 30,
+    })
+    dispatchPointerEvent(audioButton.element, 'pointerup', {
+      pointerId: 3,
+      isPrimary: true,
+      clientX: 100,
+      clientY: 100,
+      timeStamp: 40,
+    })
+    expect(currentSideAnnouncement(wrapper)).toContain('Side 2 of 2: Answer, answer text')
+    await audioButton.trigger('click')
     expect(FakeSpeechSynthesisUtterance.instances[1]?.text).toBe('answer text')
+    expect(FakeSpeechSynthesisUtterance.instances[1]?.lang).toBe('th-TH')
+    expect(FakeSpeechSynthesisUtterance.instances[1]?.voice).toBe(thaiVoice)
     await wrapper.get('[aria-label="Stop audio for Answer"]').trigger('click')
     expect(synthesis.cancel).toHaveBeenCalledTimes(2)
   })
