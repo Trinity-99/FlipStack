@@ -5,6 +5,7 @@ import BottomNavigation from '@/components/BottomNavigation.vue'
 import DeckSwitcher from '@/components/DeckSwitcher.vue'
 import FeedbackBanner from '@/components/FeedbackBanner.vue'
 import SyncStatusDot from '@/components/SyncStatusDot.vue'
+import versionData from '@/version.json'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 import { useSyncStatusStore } from '@/stores/syncStatusStore'
@@ -127,27 +128,38 @@ async function retryDeckLoading(): Promise<void> {
             </svg>
           </RouterLink>
 
-          <SyncStatusDot />
+          <div class="flex shrink-0 flex-col items-end">
+            <span
+              class="text-[9px] leading-3 text-secondary"
+              :aria-label="`App version ${versionData.version}`"
+              :title="`App version ${versionData.version}`"
+            >
+              v {{ versionData.version }}
+            </span>
+            <div class="flex items-center gap-2">
+              <SyncStatusDot />
 
-          <button
-            v-if="authStore.isAuthenticated"
-            type="button"
-            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-secondary transition-colors hover:bg-surface-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Log out"
-            title="Log out"
-            :disabled="isLoggingOut"
-            @click="requestLogout"
-          >
-            <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M10 5H6.75A1.75 1.75 0 005 6.75v10.5A1.75 1.75 0 006.75 19H10m4-3 4-4-4-4m4 4H9"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
+              <button
+                v-if="authStore.isAuthenticated"
+                type="button"
+                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-secondary transition-colors hover:bg-surface-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Log out"
+                title="Log out"
+                :disabled="isLoggingOut"
+                @click="requestLogout"
+              >
+                <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M10 5H6.75A1.75 1.75 0 005 6.75v10.5A1.75 1.75 0 006.75 19H10m4-3 4-4-4-4m4 4H9"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 

@@ -6,12 +6,34 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa';
 
+import fs from 'fs'
+import path from 'path'
+
+/**
+ * autoIncrementVersion reads the current version from src/version.json, increments the patch number, and writes it back to the file.
+ * does this on each build
+ */
+function autoIncrementVersion() {
+  return {
+    name: 'auto-increment-version',
+    buildStart() {
+      const versionFilePath = path.resolve(__dirname, 'src/version.json');
+      const versionData = JSON.parse(fs.readFileSync(versionFilePath, 'utf-8'));
+      const versionParts = versionData.version.split('.').map(Number);
+      versionParts[2] += 1; // Increment the patch number
+      versionData.version = versionParts.join('.');
+      fs.writeFileSync(versionFilePath, JSON.stringify(versionData, null, 4));
+    }
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
     tailwindcss(),
+    autoIncrementVersion(),
     VitePWA({
   registerType: 'autoUpdate',
   // Ensure these exist in your /public/ folder. Use image_14.png as your base asset.

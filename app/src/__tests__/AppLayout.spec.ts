@@ -10,6 +10,7 @@ import { Profile } from '@/models/profile'
 import { useAuthStore } from '@/stores/authStore'
 import { useDeckStore } from '@/stores/deckStore'
 import AppLayout from '@/layouts/AppLayout.vue'
+import versionData from '@/version.json'
 
 const { syncStatus } = vi.hoisted(() => ({
   syncStatus: { status: { pending: false as boolean }, dotColor: 'green' },
@@ -87,6 +88,7 @@ describe('AppLayout', () => {
     const wrapper = mount(AppLayout, { global: { plugins: [layoutRouter] } })
 
     expect(wrapper.find('header').exists()).toBe(true)
+    expect(wrapper.get('[aria-label^="App version"]').text()).toBe(`v${versionData.version}`)
     expect(wrapper.find('nav[aria-label="Main navigation"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Cards content')
     expect(wrapper.get('.min-h-dvh > div').classes()).toContain('sm:max-w-[720px]')
